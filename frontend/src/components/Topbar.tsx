@@ -27,6 +27,7 @@ export default function Topbar({
     overview: "Overview & Dashboard",
     speak: "Speak to Test",
     fixproof: "FixProof",
+    connect: "Connect a Laptop",
     "new-test": "Configure New Test",
     runs: "Test Runs",
     analysis: "Logcat & ML Analysis",

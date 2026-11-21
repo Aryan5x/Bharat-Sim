@@ -13,7 +13,8 @@ import {
   LogOut,
   Flame,
   Mic,
-  ShieldCheck
+  ShieldCheck,
+  Laptop
 } from "lucide-react";
 import { useTheme } from "../theme";
 import { type Worker } from "../api";
@@ -110,6 +111,16 @@ export default function Sidebar({
         >
           <ShieldCheck size={17} />
           {!collapsed && <span>FixProof</span>}
+        </button>
+
+        <button
+          type="button"
+          className={"nav-item " + (currentTab === "connect" ? "active" : "")}
+          onClick={() => onSelectTab("connect")}
+          title="Connect your laptop as a test worker"
+        >
+          <Laptop size={17} />
+          {!collapsed && <span>Connect a Laptop</span>}
         </button>
 
         <button

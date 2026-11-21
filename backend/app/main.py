@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import http.client
@@ -472,7 +473,8 @@ async def enforce_api_authentication(request: Request, call_next):
     database_protected = (
         request.url.path == "/api/v1/runs"
         or request.url.path.startswith("/api/v1/runs/")
-        or request.url.path in {"/api/v1/analyses", "/api/v1/workers"}
+        or request.url.path in {"/api/v1/analyses", "/api/v1/workers", "/api/v1/my-workers"}
+        or request.url.path.startswith("/api/v1/my-workers/")
         or request.url.path.startswith("/api/v1/uploads/")
     )
     # Pasted-log analysis is stateless when no run_id is supplied. It still
@@ -972,6 +974,10 @@ def init_db() -> None:
             "apk_meta_json": "TEXT",
             "scenario_json": "TEXT",
         }
+        worker_columns = {row["name"] for row in conn.execute("PRAGMA table_info(workers)").fetchall()}
+        for column in ("owner_id", "token_hash", "label", "created_at", "revoked_at"):
+            if column not in worker_columns:
+                conn.execute(f"ALTER TABLE workers ADD COLUMN {column} TEXT")
         analysis_columns = {row["name"] for row in conn.execute("PRAGMA table_info(analyses)").fetchall()}
         if "owner_id" not in analysis_columns:
             conn.execute("ALTER TABLE analyses ADD COLUMN owner_id TEXT")
@@ -1783,14 +1789,48 @@ def _run_list_item(row: dict[str, Any]) -> dict[str, Any]:
             pass
     return row
 
-def require_worker_token(request: Request) -> None:
-    """Authenticate a separately deployed worker with a high-entropy shared secret."""
+PERSONAL_WORKER_TOKEN_RE = re.compile(r"^bsw_(u-[0-9a-f]{10})_([A-Za-z0-9_-]{43})$")
+MAX_PERSONAL_WORKERS = 3
+
+
+def _hash_worker_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def require_worker_token(request: Request) -> dict[str, Any]:
+    """Authenticate a worker.
+
+    Two kinds of credential:
+    - the team's shared secret (BHARATSIM_WORKER_TOKEN): a trusted worker that may run any queued job;
+    - a personal key ("bsw_<worker id>_<secret>") issued to a signed-in user for their own laptop: it may
+      only claim, download and report runs owned by that user. Only a SHA-256 of the secret is stored.
+    """
+    supplied = request.headers.get("X-BharatSim-Worker-Token", "")
+    match = PERSONAL_WORKER_TOKEN_RE.match(supplied)
+    if match:
+        worker_id, secret = match.groups()
+        with db() as conn:
+            row = conn.execute(
+                "SELECT id,owner_id,token_hash,revoked_at FROM workers WHERE id=?", (worker_id,)
+            ).fetchone()
+        if (not row or not row["token_hash"] or row["revoked_at"] or not row["owner_id"]
+                or not hmac.compare_digest(row["token_hash"], _hash_worker_secret(secret))):
+            raise HTTPException(status_code=401, detail="Missing, revoked or invalid worker key")
+        return {"kind": "personal", "worker_id": row["id"], "owner_id": str(row["owner_id"])}
     expected = os.getenv("BHARATSIM_WORKER_TOKEN", "")
     if len(expected) < 32:
         raise HTTPException(status_code=503, detail="Worker integration is not configured")
-    supplied = request.headers.get("X-BharatSim-Worker-Token", "")
     if not hmac.compare_digest(supplied, expected):
         raise HTTPException(status_code=401, detail="Missing or invalid worker token")
+    return {"kind": "shared", "worker_id": None, "owner_id": None}
+
+
+def require_lease_scope(identity: dict[str, Any], lease: Any) -> None:
+    """A personal worker may only touch runs it claimed for its own owner."""
+    if identity["kind"] != "personal":
+        return
+    if str(lease["owner_id"] or "") != identity["owner_id"] or lease["worker_id"] != identity["worker_id"]:
+        raise HTTPException(status_code=403, detail="This worker key cannot access that run")
 
 
 def production_worker_execution_enabled() -> bool:
@@ -1827,7 +1867,9 @@ def require_production_worker_execution_approval() -> None:
 
 @app.post("/internal/worker/claim")
 def worker_claim(request: Request, payload: WorkerClaimRequest):
-    require_worker_token(request)
+    identity = require_worker_token(request)
+    if identity["kind"] == "personal" and payload.worker_id != identity["worker_id"]:
+        raise HTTPException(status_code=403, detail="worker_id does not match this worker key")
     require_production_worker_execution_approval()
     cleanup_expired_uploads()
     now = datetime.now(timezone.utc)
@@ -1838,6 +1880,10 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
         # Register without overwriting an existing worker's active lease state.
         # A duplicate poll from the same worker ID must not silently make a busy
         # worker appear idle or allow it to claim a second job.
+        if identity["kind"] == "shared":
+            owned = conn.execute("SELECT owner_id FROM workers WHERE id=?", (payload.worker_id,)).fetchone()
+            if owned and owned["owner_id"]:
+                raise HTTPException(status_code=403, detail="That worker id belongs to a personal worker")
         conn.execute(
             "INSERT INTO workers(id,last_seen,status,current_run_id) VALUES(?,?,?,NULL) "
             "ON CONFLICT(id) DO NOTHING",
@@ -1893,10 +1939,18 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
         )
         if reserved.rowcount != 1:
             return {"job": None}
-        row = conn.execute(
-            "SELECT id,apk_name,apk_sha256,persona_id,persona_json,scenario_json,attempts,owner_id FROM runs "
-            "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
-        ).fetchone()
+        if identity["kind"] == "personal":
+            row = conn.execute(
+                "SELECT id,apk_name,apk_sha256,persona_id,persona_json,scenario_json,attempts,owner_id FROM runs "
+                "WHERE status='queued' AND owner_id=? AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) "
+                "ORDER BY created_at ASC LIMIT 1",
+                (identity["owner_id"],),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT id,apk_name,apk_sha256,persona_id,persona_json,scenario_json,attempts,owner_id FROM runs "
+                "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
+            ).fetchone()
         if row is None:
             conn.execute(
                 "UPDATE workers SET status='idle' WHERE id=? AND status='claiming' AND current_run_id IS NULL",
@@ -1951,9 +2005,10 @@ def require_live_lease(conn: sqlite3.Connection, run_id: str, lease_token: str) 
 
 @app.get("/internal/worker/runs/{run_id}/apk")
 def worker_download_apk(run_id: str, request: Request, lease_token: str = Header(..., alias="X-BharatSim-Lease-Token")):
-    require_worker_token(request)
+    identity = require_worker_token(request)
     with db() as conn:
         row = require_live_lease(conn, run_id, lease_token)
+        require_lease_scope(identity, row)
         if row["apk_storage_path"]:
             try:
                 connection, response = open_private_object(row["apk_storage_path"])
@@ -1981,12 +2036,12 @@ def worker_download_apk(run_id: str, request: Request, lease_token: str = Header
 
 @app.post("/internal/worker/runs/{run_id}/heartbeat")
 def worker_heartbeat(run_id: str, request: Request, payload: WorkerHeartbeatRequest):
-    require_worker_token(request)
+    identity = require_worker_token(request)
     now = datetime.now(timezone.utc)
     new_lease = datetime.fromtimestamp(now.timestamp() + 300, timezone.utc).isoformat()
     now_text = now.isoformat()
     with db() as conn:
-        require_live_lease(conn, run_id, payload.lease_token)
+        require_lease_scope(identity, require_live_lease(conn, run_id, payload.lease_token))
         updated = conn.execute(
             "UPDATE runs SET lease_until=?, updated_at=? "
             "WHERE id=? AND status='leased' AND lease_token=? AND lease_until IS NOT NULL AND lease_until>=?",
@@ -2006,12 +2061,13 @@ def worker_heartbeat(run_id: str, request: Request, payload: WorkerHeartbeatRequ
 
 @app.post("/internal/worker/runs/{run_id}/result")
 def worker_submit_result(run_id: str, request: Request, payload: WorkerResultRequest):
-    require_worker_token(request)
+    identity = require_worker_token(request)
     encoded = json.dumps(payload.result, ensure_ascii=False)
     if len(encoded.encode("utf-8")) > 250_000:
         raise HTTPException(status_code=413, detail="Worker result exceeds the 250 KB inline limit")
     with db() as conn:
         lease = require_live_lease(conn, run_id, payload.lease_token)
+        require_lease_scope(identity, lease)
         if payload.status == "completed" and payload.result.get("status") != "completed":
             raise HTTPException(status_code=422, detail="Completed result must include report status=completed")
         if payload.status == "failed" and payload.result.get("status") not in (None, "failed"):
@@ -2071,10 +2127,15 @@ def worker_submit_result(run_id: str, request: Request, payload: WorkerResultReq
 
 
 @app.get("/api/v1/workers")
-def worker_status():
+def worker_status(request: Request):
     now = datetime.now(timezone.utc)
+    owner_id = getattr(request.state, "owner_id", None)
     with db() as conn:
-        rows = conn.execute("SELECT id,last_seen,status,current_run_id FROM workers ORDER BY last_seen DESC LIMIT 50").fetchall()
+        rows = conn.execute(
+            "SELECT id,last_seen,status,current_run_id FROM workers WHERE revoked_at IS NULL AND "
+            "(owner_id IS NULL OR owner_id=?) ORDER BY last_seen DESC LIMIT 50",
+            (owner_id,),
+        ).fetchall()
     items = []
     for row in rows:
         try:
@@ -2549,6 +2610,80 @@ def _caller_is_authenticated(request: Request) -> bool:
         return True
     except Exception:
         return False
+
+
+# ---------------------------------------------------------------- Personal laptop workers
+
+
+class PersonalWorkerRequest(BaseModel):
+    label: str = Field(default="My laptop", min_length=1, max_length=40, pattern=r"^[\w .,()'-]+$")
+
+
+def _personal_worker_rows(conn, owner_id: str) -> list[dict[str, Any]]:
+    now = datetime.now(timezone.utc)
+    rows = conn.execute(
+        "SELECT id,label,created_at,last_seen,status,current_run_id FROM workers "
+        "WHERE owner_id=? AND revoked_at IS NULL ORDER BY created_at DESC",
+        (owner_id,),
+    ).fetchall()
+    items = []
+    for row in rows:
+        try:
+            online = (now - datetime.fromisoformat(row["last_seen"])).total_seconds() <= 90
+        except (TypeError, ValueError):
+            online = False
+        items.append({"id": row["id"], "label": row["label"], "created_at": row["created_at"],
+                      "last_seen": row["last_seen"], "online": online,
+                      "busy": bool(online and row["current_run_id"])})
+    return items
+
+
+@app.get("/api/v1/my-workers")
+def list_personal_workers(request: Request):
+    owner_id = getattr(request.state, "owner_id", None)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Sign in to manage your laptop workers.")
+    with db() as conn:
+        return {"items": _personal_worker_rows(conn, owner_id), "max": MAX_PERSONAL_WORKERS}
+
+
+@app.post("/api/v1/my-workers")
+def create_personal_worker(payload: PersonalWorkerRequest, request: Request):
+    """Issue a worker key that can only run this user's own tests. The key is shown once."""
+    owner_id = getattr(request.state, "owner_id", None)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Sign in to connect a laptop.")
+    worker_id = "u-" + uuid.uuid4().hex[:10]
+    secret = base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip("=")
+    now_text = utcnow()
+    with db() as conn:
+        active = conn.execute("SELECT COUNT(*) AS n FROM workers WHERE owner_id=? AND revoked_at IS NULL", (owner_id,)).fetchone()
+        if active and int(active["n"]) >= MAX_PERSONAL_WORKERS:
+            raise HTTPException(status_code=409, detail=f"You can connect up to {MAX_PERSONAL_WORKERS} laptops. Remove one first.")
+        conn.execute(
+            "INSERT INTO workers(id,last_seen,status,current_run_id,owner_id,token_hash,label,created_at) VALUES(?,?,?,NULL,?,?,?,?)",
+            (worker_id, "1970-01-01T00:00:00+00:00", "idle", owner_id, _hash_worker_secret(secret), payload.label.strip(), now_text),
+        )
+        record_audit_event(conn, owner_id, "user", owner_id, "worker.personal_created", "worker", worker_id, {"label": payload.label.strip()})
+    return {"worker_id": worker_id, "worker_key": f"bsw_{worker_id}_{secret}", "label": payload.label.strip(),
+            "api_url": str(request.base_url).rstrip("/"),
+            "note": "Copy this key now; BharatSim stores only a hash and cannot show it again."}
+
+
+@app.delete("/api/v1/my-workers/{worker_id}")
+def revoke_personal_worker(worker_id: str, request: Request):
+    owner_id = getattr(request.state, "owner_id", None)
+    if not owner_id:
+        raise HTTPException(status_code=401, detail="Sign in to manage your laptop workers.")
+    with db() as conn:
+        updated = conn.execute(
+            "UPDATE workers SET revoked_at=?, token_hash=NULL, status='offline' WHERE id=? AND owner_id=? AND revoked_at IS NULL",
+            (utcnow(), worker_id, owner_id),
+        )
+        if updated.rowcount != 1:
+            raise HTTPException(status_code=404, detail="Worker not found")
+        record_audit_event(conn, owner_id, "user", owner_id, "worker.personal_revoked", "worker", worker_id, {})
+    return {"id": worker_id, "revoked": True}
 
 
 # ---------------------------------------------------------------- Speak-to-Test, scenarios, FixProof

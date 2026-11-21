@@ -60,6 +60,7 @@ const SettingsView = lazy(() => import("./components/SettingsView"));
 const RunDetailView = lazy(() => import("./components/RunDetailView"));
 const SpeakToTestView = lazy(() => import("./components/SpeakToTestView"));
 const FixProofView = lazy(() => import("./components/FixProofView"));
+const ConnectLaptopView = lazy(() => import("./components/ConnectLaptopView"));
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 // API_DOCS_URL kept for future use
@@ -109,6 +110,8 @@ export default function App() {
     ? "speak"
     : location.pathname.startsWith("/fixproof")
     ? "fixproof"
+    : location.pathname.startsWith("/connect")
+    ? "connect"
     : location.pathname.startsWith("/landing")
     ? "landing"
     : "overview";
@@ -661,6 +664,7 @@ export default function App() {
               element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
             />
             <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
+            <Route path="/connect" element={<ConnectLaptopView previewMode={previewMode} />} />
 
             {/* Comparative Telemetry & Anomaly Analysis route */}
             <Route
