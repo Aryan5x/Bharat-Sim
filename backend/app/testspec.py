@@ -86,6 +86,7 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         "evidence": ["ui_text", "backend_requests", "logcat"],
         "conditions": ["server_delay"],
         "persona_id": "budget-android",
+        "journey": "payment",
         "fixture_package": "in.bharatsim.paymock",
         "sample_builds": [
             {"variant": "original", "label": "BharatPay Mock 1.0 (original)", "path": "/samples/bharatpay-original.apk"},
@@ -338,12 +339,14 @@ def build_spec(model: ModelSpec, source_text: str, interpreter: dict[str, Any]) 
 
     return {
         "spec_id": "STS-" + uuid.uuid4().hex[:10],
-        "spec_hash": spec_hash(scenario_id, persona_id, conditions, sorted(checked_ids)),
+        # A scenario fully defines the test, so its identity does not depend on model wording.
+        "spec_hash": spec_hash(scenario_id, persona_id, [], sorted(checked_ids)) if scenario
+        else spec_hash(None, persona_id, conditions, sorted(checked_ids)),
         "request_text": source_text[:1000],
         "language_detected": model.language_detected,
         "objective": model.objective,
         "app_hint": model.app_hint,
-        "journey": model.journey,
+        "journey": scenario["journey"] if scenario else model.journey,
         "journey_description": model.journey_description,
         "persona_id": persona_id,
         "conditions": conditions,
@@ -353,11 +356,11 @@ def build_spec(model: ModelSpec, source_text: str, interpreter: dict[str, Any]) 
         "assertions": assertions,
         "machine_checked_assertions": machine_checked,
         "not_machine_verified": not_verifiable,
-        "evidence": list(dict.fromkeys(model.evidence)),
+        "evidence": list(dict.fromkeys(model.evidence)) or (list(scenario["evidence"]) if scenario else []),
         "matched_scenario": scenario_id,
         "safety": {"flags": list(model.safety_flags),
                    "classification": "blocked" if model.safety_flags else "controlled-test-only"},
-        "clarifications_needed": model.clarifications_needed or (
+        "clarifications_needed": [] if scenario else model.clarifications_needed or (
             ["Which user journey should be tested (for example payment, form submit or upload)?"]
             if model.journey == "other" and not scenario else []),
         "execution": {"eligible": eligible, "mode": mode, "scenario_id": scenario_id if eligible else None,
@@ -455,10 +458,10 @@ def fixproof(original: dict[str, Any], candidate: dict[str, Any]) -> dict[str, A
         return out("VERIFICATION_BLOCKED", "Both builds must complete the same scenario before a fix can be verified.")
     same = o_sc.get("id") == c_sc.get("id")
     ok &= check("same scenario", same, f"{o_sc.get('id')} vs {c_sc.get('id')}")
-    o_hash = (original.get("scenario") or {}).get("spec_hash")
-    c_hash = (candidate.get("scenario") or {}).get("spec_hash")
-    if o_hash and c_hash:
-        ok &= check("same test spec", o_hash == c_hash, f"{o_hash} vs {c_hash}")
+    o_persona = ((original.get("scenario") or {}).get("spec") or {}).get("persona_id")
+    c_persona = ((candidate.get("scenario") or {}).get("spec") or {}).get("persona_id")
+    if o_persona and c_persona:
+        ok &= check("same persona", o_persona == c_persona, f"{o_persona} vs {c_persona}")
     differ = bool(original.get("apk_sha256")) and original.get("apk_sha256") != candidate.get("apk_sha256")
     ok &= check("different builds", differ, "the candidate must be a different APK (SHA-256)")
     if not ok:

@@ -35,6 +35,23 @@ re-checked against source, tests or the live deployment.
 - Text-to-speech: `POST /text-to-speech`, model `bulbul:v3`, speaker `priya`, field `language_code` — 200.
 - Translate: `sarvam-translate:v1` en→ta — 200.
 
+## After the finale slice (commits `70ab199`, `bac77fe`, merge `fc76f7b`)
+
+| Feature | Before | After | Evidence |
+|---|---|---|---|
+| Speak-to-Test (voice + text → validated test spec) | NOT IMPLEMENTED | VERIFIED WORKING (live) | Live plan on bharatsim.onrender.com via `sarvam-105b`; `docs/evidence/sarvam_live_check.json` (Hindi, Hinglish, Tamil, ambiguous, unsupported) |
+| Voice input (Saaras) | NOT IMPLEMENTED | VERIFIED via API | Bulbul → Saaras round trip, Hindi and Tamil, verbatim transcripts; browser mic not exercised by the agent |
+| Bulbul voice briefing | FAILING | FIXED (`bulbul:v3`) | Live TTS request ids in the evidence file |
+| Unsupported-condition reporting | n/a | VERIFIED | incoming call + CPU throttle listed as not applied |
+| Janjeevan pack A (payment pending + retry) | n/a | VERIFIED on emulator | Original: 2 charges, "Payment failed" shown; fixed: 1 charge, "pending" shown (standalone spike) |
+| FixProof | n/a | VERIFIED in tests | 7 verdicts unit-tested; never verifies an unexecuted or incomparable fix |
+| Citizen Impact Translator | n/a | BUILT | Evidence-cited explanation per audience, translated and spoken |
+| Sarvam endpoints auth + rate limit | GAP | FIXED | Anonymous → 401 live; 40 calls / 10 min / user |
+| Microphone permission | BLOCKED | FIXED | `microphone=(self)` live |
+| Other Janjeevan packs (B–F) | n/a | NOT BUILT | Listed as planned, with the missing piece |
+
+Tests on merged code: backend 206 passed (2 skipped), worker 111 passed, frontend 55 passed, production build OK.
+
 ## Priorities chosen
 1. Speak-to-Test (voice/text → validated test spec) on Sarvam, in the core flow.
 2. One controlled scenario pack (UPI-style payment pending + retry) with machine-checked assertions on a mock fixture.

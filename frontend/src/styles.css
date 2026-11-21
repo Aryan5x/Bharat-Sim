@@ -3734,49 +3734,27 @@ svg { flex-shrink: 0; }
   }
   .landing-section-title { font-size: 1.5rem; }
 }
-/* Landing page section layouts â€” Midnight Indigo theme */
-.landing-section {
-  padding: 64px 48px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-.landing-section-alt {
-  padding: 64px 48px;
-  background: rgba(13, 18, 32, 0.6);
-  border-top: 1px solid #1A2540;
-  border-bottom: 1px solid #1A2540;
-}
-.landing-section-alt .landing-section {
-  /* inner container when alt wraps a section */
-  background: none;
-  border: none;
-}
-.landing-section-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: #7667F8;
-  margin-bottom: 12px;
-}
-.landing-section-title {
-  font-size: 2rem;
-  font-weight: 800;
-  font-family: 'Manrope', sans-serif;
-  color: #F5F6FC;
-  margin-bottom: 12px;
-  line-height: 1.2;
-}
-.landing-section-subtitle {
-  font-size: 1rem;
-  color: #A1AAC0;
-  line-height: 1.65;
-  max-width: 580px;
-}
-@media (max-width: 768px) {
-  .landing-section,
-  .landing-section-alt {
-    padding: 40px 20px;
-  }
-  .landing-section-title { font-size: 1.5rem; }
-}
+
+/* Effects components (no Tailwind in this project: real classes) */
+.particle-field-canvas{opacity:.4}
+.spotlight-wrap{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.spotlight-svg{position:absolute;top:0;left:0;width:138%;height:169%;opacity:0;pointer-events:none}
+@media (min-width:1024px){.spotlight-svg{width:84%}}
+.dashboard-overview-container>*:not(.spotlight-wrap),.landing-hero>*:not(.spotlight-wrap){position:relative;z-index:1}
+.marquee-container{display:flex;overflow:hidden;padding:8px;user-select:none;max-width:100%}
+.marquee-track{display:flex;flex-shrink:0;align-items:center;justify-content:space-around;gap:16px;padding-right:16px}
+.marquee-container.pause-on-hover:hover .marquee-track{animation-play-state:paused}
+.inference-loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;min-height:260px;width:100%}
+.inference-loader.fullscreen{position:fixed;inset:0;z-index:50;background:rgba(8,11,20,.85);backdrop-filter:blur(8px)}
+.inference-rings{position:relative;display:flex;align-items:center;justify-content:center;width:80px;height:80px}
+.inference-rings .ring{position:absolute;border-radius:50%}
+.ring-outer{width:80px;height:80px;border:1px solid rgba(118,103,248,.25);animation:pulse-radar 2s ease-out infinite}
+.ring-mid{width:64px;height:64px;border:1px solid rgba(118,103,248,.35)}
+.ring-core{width:48px;height:48px;background:rgba(118,103,248,.1)}
+.inference-core{position:relative;z-index:1;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;border:1px solid rgba(118,103,248,.5);background:var(--bg-surface);color:#9A8BFF;box-shadow:0 0 24px rgba(118,103,248,.35)}
+.inference-text{margin-top:18px;text-align:center}
+.inference-text b{display:block;font:600 11px var(--mono);letter-spacing:1px;text-transform:uppercase;color:#9A8BFF}
+.inference-text small{display:block;margin-top:6px;font-size:12px;color:var(--text-muted);max-width:380px}
+
+/* Keep visually-hidden labels inside scrolling tables (no page-wide horizontal scroll) */
+.table-wrap{position:relative}

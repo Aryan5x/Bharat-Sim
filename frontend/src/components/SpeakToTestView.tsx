@@ -28,14 +28,26 @@ const EXAMPLES = [
 ];
 
 const MAX_RECORD_MS = 25000;
+const STORE_KEY = "bharatsim.speak.plan";
+
+function loadPlan(): { text: string; spec: TestSpec | null } {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // storage blocked or corrupted: start empty
+  }
+  return { text: "", spec: null };
+}
 
 function humanize(value: string): string {
   return value.replaceAll("_", " ");
 }
 
 export default function SpeakToTestView({ personas, previewMode, busy, onSubmitRun }: SpeakToTestViewProps) {
-  const [text, setText] = useState("");
-  const [spec, setSpec] = useState<TestSpec | null>(null);
+  // The plan survives navigating to a run and back, so the second build can reuse it.
+  const [text, setText] = useState(() => loadPlan().text);
+  const [spec, setSpec] = useState<TestSpec | null>(() => loadPlan().spec);
   const [error, setError] = useState("");
   const [working, setWorking] = useState<"" | "interpret" | "transcribe">("");
   const [recording, setRecording] = useState(false);
@@ -54,6 +66,14 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
       recorder.current?.stream.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORE_KEY, JSON.stringify({ text, spec }));
+    } catch {
+      // per-tab convenience only
+    }
+  }, [text, spec]);
 
   const scenario = packs.find((p) => p.id === spec?.execution.scenario_id);
   const personaName = (id: string) => personas.find((p) => p.id === id)?.name || id;
