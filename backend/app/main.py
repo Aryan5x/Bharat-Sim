@@ -301,7 +301,8 @@ def _single_object_size(object_path: str) -> int | None:
         connection.request("HEAD", endpoint, headers=_storage_headers())
         response = connection.getresponse()
         response.read(1024)
-        if response.status == 404:
+        # Supabase Storage answers HEAD for a missing object with 400 (body-less), not 404.
+        if response.status in (400, 404):
             return None
         if response.status != 200:
             raise RuntimeError(f"Supabase object verification failed ({response.status})")
