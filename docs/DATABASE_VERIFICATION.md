@@ -78,3 +78,4 @@ Because SQLite and PostgreSQL have slight syntax divergence:
   - Translates queries dynamically.
   - Converts JSON fields and timestamps faithfully.
   - Supports rollback on exception inside transaction blocks.
+

@@ -75,3 +75,4 @@ flowchart TD
 14. `worker/tests/test_condition_applicator.py` — ADB and network applicator (20 tests)
 15. `worker/tests/test_network_shaper.py` — Traffic control shaping (10 tests)
 16. `worker/tests/test_agent.py` — Worker polling agent loop (16 tests)
+
