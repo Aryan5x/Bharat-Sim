@@ -63,3 +63,4 @@ BharatSim underwent comprehensive security audits aligned with the ArgosX securi
 - Workers poll isolated tasks and execute them on dedicated emulator instances.
 - Android ADB automation runs with bounded bounds and restricted permissions (`monkey` throttled with no system key access).
 - No arbitrary remote shell commands are accepted from unauthenticated web clients.
+

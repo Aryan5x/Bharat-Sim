@@ -72,3 +72,4 @@ When an anomaly or failure is detected, the classifier triggers [`backend/app/sa
 1. **Plain-Language Root Cause & Remediation** in English and Hindi.
 2. **Defensive Code Fixes** (e.g. `BitmapFactory.Options.inSampleSize`, `ExponentialBackoffRetry`).
 3. **Voice Audio Briefings** via Sarvam AI Bulbul TTS (`/api/v1/translate/audio`).
+

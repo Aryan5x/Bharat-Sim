@@ -101,3 +101,4 @@ def get_all_scenarios() -> list[dict[str, Any]]:
 
 def get_scenario_by_id(scenario_id: str) -> dict[str, Any] | None:
     return EVALUATOR_SCENARIOS.get(scenario_id)
+

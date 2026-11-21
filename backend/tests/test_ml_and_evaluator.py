@@ -158,3 +158,4 @@ def test_analyze_logs_with_ml_enrichment(client):
     first_finding = data["findings"][0]
     assert "sarvam_explanation" in first_finding
     assert "code_remedy" in first_finding["sarvam_explanation"]
+

@@ -95,3 +95,4 @@ After the exploration sequence completes, the worker queries Android subsystems:
 2. **Memory Analysis (`dumpsys meminfo <package>`)**:
    - Parses Native Heap, Dalvik Heap, Total PSS, and Private Dirty pages.
    - Flags potential memory leaks and near-OOM conditions under 2GB RAM limits.
+
