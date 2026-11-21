@@ -34,6 +34,7 @@ import {
 
 import PersonaPanel from "./components/PersonaPanel";
 import UploadPanel from "./components/UploadPanel";
+import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from "./components/CustomPersonaBuilder";
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
@@ -50,7 +51,7 @@ import NewTestWizard from "./components/NewTestWizard";
 import { downloadAnalysisPdf } from "./pdfExport";
 import CompareRunsView from "./components/CompareRunsView";
 import SettingsView from "./components/SettingsView";
-import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
+import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, uploadApkSigned, type SignedApkUploadTicket } from "./storageUpload";
 import { enterDemoMode, isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
@@ -64,6 +65,7 @@ export default function App() {
   const previewMode = isDemoMode();
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
+  const [customPersona, setCustomPersona] = useState<CustomPersona>(DEFAULT_CUSTOM_PERSONA);
   const [runs, setRuns] = useState<Run[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(() => previewMode ? null : loadSavedAnalysis(readSession()?.user?.id));
   const [logText, setLogText] = useState("");
@@ -179,17 +181,38 @@ export default function App() {
       if (capabilities?.database_persistence !== true || capabilities?.apk_upload !== true) {
         throw new Error("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
       }
+      if (selected === "custom") {
+        const problems = customPersonaErrors(customPersona);
+        if (problems.length) throw new Error("Fix the custom persona first: " + problems.join("; "));
+      }
+      const personaFields = selected === "custom" ? { persona_id: "custom", custom_persona: customPersona } : { persona_id: selected };
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
         if (!globalThis.crypto?.subtle) throw new Error("Secure file hashing is unavailable in this browser.");
         const digest = await crypto.subtle.digest("SHA-256", await targetFile.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
         let ticket = getPendingApkUpload(sha256, targetFile);
+        if (ticket && !ticket.signed_upload_url) {
+          // Tickets from the old resumable flow cannot be completed; start fresh.
+          clearPendingApkUpload(sha256);
+          ticket = null;
+        }
+        if (ticket) {
+          // Only resume when the server still has this run waiting for its upload;
+          // a deleted, cancelled or already-uploaded run needs a fresh ticket.
+          const resumable = await api<Run>("/api/v1/runs/" + encodeURIComponent(ticket.run_id))
+            .then((existing) => existing.status === "awaiting_worker")
+            .catch(() => false);
+          if (!resumable) {
+            clearPendingApkUpload(sha256);
+            ticket = null;
+          }
+        }
         if (!ticket) {
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ persona_id: selected, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
           });
           savePendingApkUpload(sha256, targetFile, ticket);
         } else {
@@ -199,14 +222,15 @@ export default function App() {
           setNotice("Uploading APK securely… " + percentage + "%");
         };
         try {
-          await uploadApkResumable(targetFile, sha256, ticket, uploadProgress);
+          if (ticket.signed_upload_url) await uploadApkSigned(targetFile, ticket, uploadProgress);
+          else await uploadApkResumable(targetFile, sha256, ticket, uploadProgress);
         } catch (uploadError) {
           if (!(uploadError instanceof Error) || !uploadError.message.includes("fresh upload ticket")) throw uploadError;
           clearPendingApkUpload(sha256);
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ persona_id: selected, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
           });
           savePendingApkUpload(sha256, targetFile, ticket);
           setNotice("The previous upload expired. Restarting securely with a fresh upload ticket…");
@@ -223,7 +247,8 @@ export default function App() {
           throw new Error("Large APK upload is unavailable until private Supabase Storage is configured. This deployment can accept files up to 4 MB.");
         }
         const body = new FormData();
-        body.append("persona_id", selected);
+        body.append("persona_id", personaFields.persona_id);
+        if (selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
         body.append("apk", targetFile);
         run = await api<Run & { message: string }>("/api/v1/runs", {
           method: "POST",
@@ -606,6 +631,8 @@ export default function App() {
                     : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
                   onSubmit={submitApkFile}
                   onCancel={() => navigate("/")}
+                  customPersona={customPersona}
+                  onCustomPersonaChange={setCustomPersona}
                 />
               }
             />
@@ -704,7 +731,7 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <RunsTable runs={runs} personas={personas} />
+                    <RunsTable runs={runs} personas={personas} onDeleted={() => refresh(true)} />
                   )}
                 </section>
               }

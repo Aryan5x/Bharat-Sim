@@ -1,0 +1,29 @@
+{
+  "model_version": "failure-classifier-1.0",
+  "trained_at": "2026-11-21T12:48:20.133447+00:00",
+  "samples": 9140,
+  "class_counts": {
+    "other": 3116,
+    "crash": 1404,
+    "anr": 1120,
+    "oom": 1540,
+    "network": 1260,
+    "storage": 700
+  },
+  "holdout_accuracy": 0.7843,
+  "holdout_accuracy_std": 0.0913,
+  "holdout_macro_f1": 0.7707,
+  "holdout_macro_f1_std": 0.1024,
+  "per_class_f1": {
+    "anr": 0.5865,
+    "crash": 0.8879,
+    "network": 0.7143,
+    "oom": 0.8421,
+    "other": 0.793,
+    "storage": 0.8889
+  },
+  "evaluation": "5-fold GroupKFold: each fold holds out whole templates and LogHub log tags",
+  "holdout_samples": 9140,
+  "data": "LogHub Android_2k (weak rule labels) + templated failure lines + worker/.cache/labelled.tsv",
+  "caveat": "Held-out metrics are measured on this mixed, partly templated dataset; they are not field accuracy."
+}

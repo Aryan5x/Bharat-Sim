@@ -8,6 +8,7 @@ import {
   X
 } from "lucide-react";
 import { type Persona } from "../api";
+import CustomPersonaBuilder, { DEFAULT_CUSTOM_PERSONA, type CustomPersona } from "./CustomPersonaBuilder";
 
 interface NewTestWizardProps {
   personas: Persona[];
@@ -19,6 +20,8 @@ interface NewTestWizardProps {
   lockedReason?: string;
   onSubmit: (apkFile: File) => Promise<void>;
   onCancel: () => void;
+  customPersona?: CustomPersona;
+  onCustomPersonaChange?: (p: CustomPersona) => void;
 }
 
 export default function NewTestWizard({
@@ -30,7 +33,9 @@ export default function NewTestWizard({
   maxUploadMb = 150,
   lockedReason,
   onSubmit,
-  onCancel
+  onCancel,
+  customPersona = DEFAULT_CUSTOM_PERSONA,
+  onCustomPersonaChange = () => undefined
 }: NewTestWizardProps) {
   const [apkFile, setApkFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -252,13 +257,31 @@ export default function NewTestWizard({
                     <b>{p.down_kbps} kbps</b>
                   </div>
                   <div>
-                    <small>Packet Loss Target · Unsupported</small>
+                    <small>Packet loss</small>
                     <b>{p.packet_loss_pct}%</b>
                   </div>
                 </div>
               </button>
             ))}
+            <button
+              type="button"
+              className={"wizard-persona-card " + (selectedPersona === "custom" ? "selected" : "")}
+              aria-pressed={selectedPersona === "custom"}
+              onClick={() => onSelectPersona("custom")}
+            >
+              <div className="persona-top">
+                <div className="persona-title-group">
+                  <strong>Custom persona</strong>
+                  <small>Your own device and network</small>
+                </div>
+                <span className="risk-badge medium">CUSTOM</span>
+              </div>
+              <p className="persona-desc">Set RAM, CPU cores, screen, storage, battery saver, bandwidth, latency, loss, resets and outage length. Every value is applied on the emulator.</p>
+            </button>
           </div>
+          {selectedPersona === "custom" && (
+            <CustomPersonaBuilder value={customPersona} onChange={onCustomPersonaChange} />
+          )}
           <p className="worker-defaults-note">
             Persona values are requested targets, not proof that every condition is applied. The worker verifies supported latency/bandwidth and reversible battery/storage controls; packet loss and CPU throttling are unsupported, while RAM is report-only.
           </p>
