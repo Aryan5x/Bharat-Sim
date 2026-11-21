@@ -175,6 +175,17 @@ export default function App() {
         const digest = await crypto.subtle.digest("SHA-256", await apk.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
         let ticket = getPendingApkUpload(sha256, apk);
+        if (ticket) {
+          // Only resume when the server still has this run waiting for its upload;
+          // a deleted, cancelled or already-uploaded run needs a fresh ticket.
+          const resumable = await api<Run>("/api/v1/runs/" + encodeURIComponent(ticket.run_id))
+            .then((existing) => existing.status === "awaiting_worker")
+            .catch(() => false);
+          if (!resumable) {
+            clearPendingApkUpload(sha256);
+            ticket = null;
+          }
+        }
         if (!ticket) {
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
