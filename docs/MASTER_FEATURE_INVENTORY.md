@@ -1,91 +1,64 @@
 # BharatSim — Master Feature Inventory
 
-**Project:** BharatSim — The Cheap Phone Test  
-**Verification Date:** November 21, 2026  
-**Auditor:** Autonomous Senior QA & Product Engineering Team  
+**Audit date:** 2026-11-21 (IST)  
+**Main baseline:** `2c754dcb428fdbacc67da18d41fad3c1d0745c83`  
+**Candidate branch:** `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`  
+**Production:** https://bharat-sim-81g2.vercel.app
 
----
+## Status definitions
 
-## 1. Feature Status Summary
+- **IMPLEMENTED AND VERIFIED** — passed a reproducible test on the specified SHA/environment.
+- **IMPLEMENTED BUT NOT VERIFIED** — code exists; target runtime behavior has not been proven.
+- **PARTIALLY IMPLEMENTED** — some behavior exists, but key lifecycle/requirements remain absent.
+- **BLOCKED BY EXTERNAL DEPENDENCY** — infrastructure/provider/credentials unavailable.
+- **NOT IMPLEMENTED** — no complete implementation found.
+- **FAILED** — an observed test or live check failed.
 
-- **Total Discovered Features:** 38
-- **Implemented & Verified:** 32
-- **Implemented But Awaiting Worker Host (Blocked by HW/AVD Infrastructure):** 4
-- **Partially Implemented:** 2
-- **Not Implemented / Mocked in Production:** 0
+## Feature matrix
 
-| Status Category | Count | Percentage |
-|---|---|---|
-| IMPLEMENTED AND VERIFIED | 32 | 84.2% |
-| BLOCKED BY EXTERNAL DEPENDENCY | 4 | 10.5% |
-| PARTIALLY IMPLEMENTED | 2 | 5.3% |
-| FAILED / BROKEN | 0 | 0.0% |
+This inventory records major end-user flows and backend subsystems. It is not an AST-generated enumeration of every individual JSX control. The route/control matrix is maintained in `FEATURE_INTERACTION_INVENTORY.md`.
 
----
+| ID | Feature | Frontend / route | Backend / dependency | Status | Evidence and remaining work |
+|---|---|---|---|---|---|
+| AUTH-001 | Email/password sign-in | `AuthGate.tsx` | Supabase Auth | IMPLEMENTED BUT NOT VERIFIED | Sign-in code exists; real deployed journey not run |
+| AUTH-002 | Registration / email verification | `AuthGate.tsx` | Supabase Auth / SMTP | PARTIALLY IMPLEMENTED | Sign-up exists; full verification/resend journey incomplete |
+| AUTH-003 | Session persistence / refresh | `auth.ts` | Supabase token endpoint | IMPLEMENTED BUT NOT VERIFIED | Session storage/refresh code exists; expired-session acceptance outstanding |
+| AUTH-004 | Logout | Sidebar/AuthGate | Supabase logout | IMPLEMENTED BUT NOT VERIFIED | Local clear fallback exists; deployed session lifecycle not tested |
+| APK-001 | APK file selection / drag-drop | `UploadPanel.tsx`, `NewTestWizard.tsx` | Browser File API | IMPLEMENTED BUT NOT VERIFIED | UI implementation exists; production upload blocked |
+| APK-002 | APK validation / metadata | Backend APK validation | FastAPI parser | IMPLEMENTED BUT NOT VERIFIED | Code exists; adversarial archive test coverage incomplete |
+| APK-003 | APK SHA-256 / duplicate controls | App upload handler | SHA-256 / DB | PARTIALLY IMPLEMENTED | Hashing implemented; production DB unavailable |
+| APK-004 | Signed/resumable private upload | `storageUpload.ts` | Supabase private Storage | BLOCKED BY EXTERNAL DEPENDENCY | Production storage capability unavailable; no live round trip |
+| PERSONA-001 | Persona catalogue | Persona panel / wizard | `GET /api/v1/personas` | IMPLEMENTED AND VERIFIED | API/CI smoke returns personas; config is not evidence of applied constraints |
+| TEST-001 | Test registration | New-test wizard | `POST /api/v1/runs`, DB/storage | BLOCKED BY EXTERNAL DEPENDENCY | Production DB/storage unavailable |
+| TEST-002 | Baseline + constrained paired run | Run configuration | Isolated Android worker | BLOCKED BY EXTERNAL DEPENDENCY | No production worker; no production pair execution |
+| TEST-003 | Run lifecycle/status polling | Run detail | Runs API/events | IMPLEMENTED BUT NOT VERIFIED | Polling code exists; no active production run |
+| WORKER-001 | Worker auth / heartbeat | Worker status surfaces | Worker token + DB | BLOCKED BY EXTERNAL DEPENDENCY | Production worker not configured |
+| WORKER-002 | Job claim / lease / recovery | Worker agent | Database leases | IMPLEMENTED BUT NOT VERIFIED | Worker guard tests exist; production crash/recovery unverified |
+| ANDROID-001 | APK install / launch | Worker runner | ADB/emulator | IMPLEMENTED BUT NOT VERIFIED | Controlled fixture execution exists; customer APKs unverified |
+| ANDROID-002 | Logcat / gfxinfo / meminfo telemetry | Run detail | ADB and Android services | IMPLEMENTED BUT NOT VERIFIED | Collection code exists; real production telemetry unverified |
+| NET-001 | Latency / bandwidth constraints | Persona/worker | Emulator controls / fixture proxy | PARTIALLY IMPLEMENTED | CI fixture readback exists; arbitrary APK traffic path not verified |
+| NET-002 | Packet loss / outage / CPU stress | Persona/worker | tc/netem or equivalent | NOT IMPLEMENTED | Explicitly unsupported/not enabled |
+| ML-001 | Logcat failure classifier | Findings / analysis | TF-IDF centroid | IMPLEMENTED BUT NOT VERIFIED | Small curated dataset; no independent holdout evaluation |
+| ML-002 | Anomaly / regression analysis | Compare | Deterministic statistical heuristics | PARTIALLY IMPLEMENTED | Not a validated multivariate ML model |
+| SCORE-001 | BharatScore | Analysis / run detail | Deterministic scoring | IMPLEMENTED BUT NOT VERIFIED | Evidence-driven code; comprehensive boundaries/reproducibility not independently reviewed |
+| REPORT-001 | JSON analysis export | Analysis route | Browser Blob | IMPLEMENTED BUT NOT VERIFIED | Download code exists; full generated artifact validation still needed |
+| REPORT-002 | JSON run report | Run detail | Owner-scoped API report | IMPLEMENTED BUT NOT VERIFIED | API code exists; production persisted object retention not verified |
+| REPORT-003 | Analysis PDF export | Analysis route | Client-side PDF generator (`pdfExport.ts`) | IMPLEMENTED BUT NOT VERIFIED | PDF generator and Vitest artifact-content/pagination tests exist; Vitest assertions for PDF header, score/finding/evidence and multi-page output passed within frontend CI at `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`. This is analysis PDF, not persisted run-report PDF. |
+| REPORT-004 | Report library / sharing | Reports | DB/storage/share tokens | NOT IMPLEMENTED | No complete persisted report catalogue/share lifecycle |
+| SARVAM-001 | Translation | Analysis route | Sarvam API key | BLOCKED BY EXTERNAL DEPENDENCY | Server credential needed; live provider call not verified |
+| SARVAM-002 | Hindi/Tamil/Marathi TTS | Audio player | Sarvam Bulbul | BLOCKED BY EXTERNAL DEPENDENCY | Live speech not verified; never substitute fixture WAV |
+| HISTORY-001 | Test history / filters | `/runs` | Runs API | PARTIALLY IMPLEMENTED | Client filtering exists; server-side pagination/date filters incomplete |
+| COMPARE-001 | Owner-scoped completed-run comparison | `/compare` | Persistent measured reports | BLOCKED BY EXTERNAL DEPENDENCY | Code gated by DB; production persistence unavailable |
+| SETTINGS-001 | Light/dark theme | Settings/sidebar | ThemeProvider/localStorage | IMPLEMENTED BUT NOT VERIFIED | Shared provider exists; exact candidate browser E2E pending |
+| SETTINGS-002 | Account/language/notification persistence | Settings | User preference API | PARTIALLY IMPLEMENTED | Some browser-local preferences only |
+| SECURITY-001 | Tenant authorization / RLS | Backend routes / migrations | Supabase Auth/Postgres RLS | IMPLEMENTED BUT NOT VERIFIED | Owner checks and migrations exist; live two-user verification outstanding |
+| SECURITY-002 | APK isolation / egress | Worker runtime | Firecracker/KVM or equivalent | BLOCKED BY EXTERNAL DEPENDENCY | Dedicated host missing; public execution must stay disabled |
+| DOCS-001 | API docs navigation | Topbar | FastAPI OpenAPI | IMPLEMENTED BUT NOT VERIFIED | Same-origin link exists in candidate; deployed URL needs confirmation |
 
-## 2. Feature Inventory by Subsystem
+## Production evidence
 
-### 2.1 Authentication & Tenant Isolation (AUTH)
+Read-only checks on the live deployment returned homepage HTTP 200, `/api/v1/capabilities` HTTP 200 and `/health/ready` HTTP 503. The readiness response reported database and private storage unavailable and no production worker configured. Therefore the primary upload → Android execution → telemetry → report journey is not currently production-verifiable.
 
-| ID | Feature Name | Frontend Route | Backend Endpoint | DB / Storage | Verification Status | Test ID / Evidence | Notes / Remaining Work |
-|---|---|---|---|---|---|---|---|
-| AUTH-001 | User Registration | `/login` (Modal/Tab) | Supabase Auth API | `auth.users` | IMPLEMENTED AND VERIFIED | `auth.test.ts` (TC-A01) | Email/password sign-up via Supabase client SDK |
-| AUTH-002 | User Login & JWT Session | `/login` | Supabase Auth API | LocalStorage / Session | IMPLEMENTED AND VERIFIED | `auth.test.ts` (TC-A02) | Token stored and injected via Bearer header |
-| AUTH-003 | Session Expiry & Auto-Refresh | Global State | Supabase Auth API | LocalStorage | IMPLEMENTED AND VERIFIED | `auth.test.ts` (TC-A04) | Auto session renewal on 401 |
-| AUTH-004 | Public Preview / Demo Mode | `/` (No token) | N/A (client flag) | SessionStorage | IMPLEMENTED AND VERIFIED | `auth.test.ts` (TC-A06) | Unauthenticated preview allows viewing public demos & log analyzer |
-| AUTH-005 | Tenant Data Isolation | Global API Client | All `/api/v1/*` | `owner_id` in SQLite/Postgres | IMPLEMENTED AND VERIFIED | `test_security.py::test_owner_isolation` | Queries filtered strictly by caller's user UUID; cross-user 404/403 enforced |
+## Coverage limitations
 
-### 2.2 APK Upload & Ingestion (APK)
-
-| ID | Feature Name | Frontend Route | Backend Endpoint | DB / Storage | Verification Status | Test ID / Evidence | Notes / Remaining Work |
-|---|---|---|---|---|---|---|---|
-| APK-001 | Direct Multipart APK Upload | `/new-test`, `/` | `POST /api/v1/runs` | Supabase / SQLite storage | IMPLEMENTED AND VERIFIED | `test_api.py::test_upload_apk` | Enforces ZIP magic number, AndroidManifest.xml presence, ratio bounds |
-| APK-002 | TUS Resumable Chunked Upload | `/new-test`, `/` | `POST /api/v1/uploads/sign` | Supabase Storage bucket | IMPLEMENTED AND VERIFIED | `storageUpload.test.ts` (TC-S01..S04) | Signed upload ticket generation for APKs > 4.5 MB to bypass Vercel serverless limit |
-| APK-003 | APK Badging & Metadata Extraction | `/new-test` | `worker/runner.py` | Local / DB `runs.package_name` | IMPLEMENTED AND VERIFIED | `test_apk_parser.py` (TC-AP01) | Parses package name, launcher activity via `aapt` or pure Python fallback |
-| APK-004 | Malformed / Adversarial APK Rejection | `/new-test` | `POST /api/v1/runs` | N/A | IMPLEMENTED AND VERIFIED | `test_security.py::test_rejects_zip_slip` | Rejects zip bomb, path traversal (`../`), empty archives |
-
-### 2.3 Persona & Network Simulation (SIM)
-
-| ID | Feature Name | Frontend Route | Backend Endpoint | DB / Storage | Verification Status | Test ID / Evidence | Notes / Remaining Work |
-|---|---|---|---|---|---|---|---|
-| SIM-001 | Persona Configuration Catalog | `/new-test`, `/` | `GET /api/v1/personas` | In-memory `PERSONAS` | IMPLEMENTED AND VERIFIED | `test_api.py::test_get_personas` | Returns budget-android, edge-village, crowded-station, congested-urban-4g, storage-pressure, baseline |
-| SIM-002 | Dynamic Test Plan Preflight | `/new-test` | `POST /api/v1/plan` | In-memory | IMPLEMENTED AND VERIFIED | `test_planner.py` | Verifies condition classification (supported, unsupported, control_plane_verifiable) |
-| SIM-003 | Emulator Network Shaping (tc/netem & control plane) | Worker Engine | `worker/network_shaper.py` | Linux tc / ADB control plane | IMPLEMENTED AND VERIFIED | `test_network_shaper.py` (10 passed) | Latency, bandwidth throttle, restore verification |
-| SIM-004 | Device Condition Enforcement (Battery Saver, Storage) | Worker Engine | `worker/condition_applicator.py` | Device settings | IMPLEMENTED AND VERIFIED | `test_condition_applicator.py` (20 passed) | Applies low_power mode global settings, dummy file filling for disk pressure |
-
-### 2.4 Android Automation & Worker Infrastructure (WORKER)
-
-| ID | Feature Name | Frontend Route | Backend Endpoint | DB / Storage | Verification Status | Test ID / Evidence | Notes / Remaining Work |
-|---|---|---|---|---|---|---|---|
-| WORKER-001 | Worker Claim & Lease Protocol | N/A (Agent) | `POST /internal/worker/claim` | `runs` table (status lease) | IMPLEMENTED AND VERIFIED | `test_worker_protocol.py` | 5-minute lease, token auth via `BHARATSIM_WORKER_TOKEN` |
-| WORKER-002 | Worker Heartbeat & Crash Recovery | N/A (Agent) | `POST /internal/worker/runs/{id}/heartbeat` | `runs.worker_heartbeat_at` | IMPLEMENTED AND VERIFIED | `test_worker_protocol.py` | Auto-reassigns abandoned runs after lease timeout |
-| WORKER-003 | Worker Production Safety Gate | N/A (Agent) | `worker/agent.py` | Environment flags | IMPLEMENTED AND VERIFIED | `test_worker_safety_gate.py` | Requires 3 explicit opt-in flags to execute arbitrary APKs in production |
-| WORKER-004 | Live Android Emulator Execution | N/A (AVD) | `worker/runner.py` | Real Android AVD / Physical | BLOCKED BY EXTERNAL DEPENDENCY | `test_runner.py` (Unit passed; Hardware blocked) | Real execution requires KVM / nested virtualization host not available on serverless |
-| WORKER-005 | Cleanup & Device State Reset | Worker Engine | `worker/runner.py` | Device / AVD | IMPLEMENTED AND VERIFIED | `test_runner.py::test_runner_guarantees_cleanup_after_launch_failure` | Uninstalls APK and resets network/battery state even after test failure |
-
-### 2.5 Machine Learning & Analytics (ML)
-
-| ID | Feature Name | Frontend Route | Backend Endpoint | DB / Storage | Verification Status | Test ID / Evidence | Notes / Remaining Work |
-|---|---|---|---|---|---|---|---|
-| ML-001 | Log Failure Classification (TF-IDF) | `/analysis`, `/` | `POST /api/v1/analyze/logs` | In-memory model `failure_model.json` | IMPLEMENTED AND VERIFIED | `test_ml_and_evaluator.py` | Pure-Python centroid classifier across Crash, ANR, OOM, Network, Storage |
-| ML-002 | Performance Anomaly Detection | `/compare` | `backend/app/anomaly_detector.py` | Runs result JSON | IMPLEMENTED AND VERIFIED | `test_anomaly_detector_regression.py` | Statistical multivariate Z-score on cold start, frame jank, RAM spikes |
-| ML-003 | Bharat Readiness Score Calculation | `/runs/:id`, `/` | `backend/app/main.py` | Stored in report JSON | IMPLEMENTED AND VERIFIED | `test_analysis.py` | Multi-factor weighted score (0–100) reflecting budget Android viability |
-| ML-004 | Baseline vs Constrained Comparison | `/compare` | `POST /api/v1/runs/compare` | DB `runs` table | IMPLEMENTED AND VERIFIED | `test_number_parser_regression.py` | Calculates delta metrics, regressions, and side-by-side telemetry |
-
-### 2.6 Sarvam AI Multilingual & Voice (SARVAM)
-
-| ID | Feature Name | Frontend Route | Backend Endpoint | DB / Storage | Verification Status | Test ID / Evidence | Notes / Remaining Work |
-|---|---|---|---|---|---|---|---|
-| SARVAM-001 | LLM Failure Explanation & Fix Advice | `/runs/:id`, `/analysis` | `POST /api/v1/explain/failure` | Cached in report / API | IMPLEMENTED AND VERIFIED | `test_sarvam.py::test_explain_failure` | Produces code remedies and architectural explanations with graceful fallback |
-| SARVAM-002 | Report Translation (Hindi, Tamil, Marathi) | `/runs/:id`, `/analysis` | `POST /api/v1/translate/report` | API / Fallback dictionary | IMPLEMENTED AND VERIFIED | `test_sarvam.py::test_translate_report` | Uses `sarvam-translate:v1` with locale term preservation |
-| SARVAM-003 | Audio Voice Summary (TTS) | `/runs/:id`, `/analysis` | `POST /api/v1/translate/audio` | Base64 WAV / Supabase Storage | IMPLEMENTED AND VERIFIED | `test_sarvam.py::test_translate_audio` | Uses Sarvam Bulbul:v1 TTS; falls back to deterministic WAV fixture if uncredentialed |
-| SARVAM-004 | Frontend Audio Playback UI | `/runs/:id`, `/analysis` | Frontend Audio Player | Browser Web Audio API | IMPLEMENTED AND VERIFIED | `components.test.tsx` | Provides play/pause, scrub, playback rate, and error status |
-
-### 2.7 Reporting, History & Export (REPORT)
-
-| ID | Feature Name | Frontend Route | Backend Endpoint | DB / Storage | Verification Status | Test ID / Evidence | Notes / Remaining Work |
-|---|---|---|---|---|---|---|---|
-| REPORT-001 | Live Run Telemetry & Details | `/runs/:id` | `GET /api/v1/runs/{id}` | DB `runs` | IMPLEMENTED AND VERIFIED | `components.test.tsx` | Telemetry graphs, frame rate, RAM curves, step logs |
-| REPORT-002 | Historical Executions List | `/` (Dashboard) | `GET /api/v1/runs` | DB `runs` | IMPLEMENTED AND VERIFIED | `test_api.py::test_get_runs` | Filterable by persona, status, date |
-| REPORT-003 | Report JSON Export | `/runs/:id` | `GET /api/v1/runs/{id}/report` | DB `runs.result_json` | IMPLEMENTED AND VERIFIED | `test_api.py::test_get_report` | Clean machine-readable JSON structure |
-| REPORT-004 | PDF Report Export | `/runs/:id` | Client-side print / PDF renderer | Browser print stylesheet | PARTIALLY IMPLEMENTED | Manual print verification | Client-side print styles format clean PDF; server-side headless chrome PDF is future work |
+This matrix does not claim every JSX control has its own unique row; use `FEATURE_INTERACTION_INVENTORY.md` for navigation/control coverage. A row must not be marked verified based only on code existence or a successful build.
