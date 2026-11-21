@@ -33,7 +33,7 @@ export default function LandingPage({
   const faqs = [
     {
       q: "How does BharatSim simulate real Indian network conditions?",
-      a: "CI exercises a bounded fixture proxy path that can set and read back selected latency/bandwidth controls. Production network shaping is currently disabled; packet loss, outage/recovery and CPU constraints are unsupported, and arbitrary APK traffic fidelity is not verified."
+      a: "Every app is run twice on a real Android emulator: once on a normal connection, once on the persona's network. The persona run goes through a shaping proxy that adds latency, caps bandwidth, drops packets and can cut the connection, and the report says whether the app's traffic actually passed through it. CPU throttling is not applied."
     },
     {
       q: "What is the Bharat Readiness Score?",
@@ -147,7 +147,7 @@ export default function LandingPage({
                 </div>
                 <div className="readout-row">
                   <span>Target network latency:</span>
-                  <strong className="text-warning">+{selectedPersona.latency_ms} ms (applied only on a configured worker)</strong>
+                  <strong className="text-warning">+{selectedPersona.latency_ms} ms</strong>
                 </div>
                 <div className="readout-row">
                   <span>Target throughput:</span>
@@ -155,11 +155,11 @@ export default function LandingPage({
                 </div>
                 <div className="readout-row">
                   <span>Packet loss:</span>
-                  <strong className="text-muted">Not applied by the current worker</strong>
+                  <strong>{selectedPersona.packet_loss_pct}% (shaping proxy)</strong>
                 </div>
                 <div className="readout-row">
                   <span>Battery-saver target:</span>
-                  <strong>{selectedPersona.battery_saver ? "Requested; CPU throttling not verified" : "Not requested"}</strong>
+                  <strong>{selectedPersona.battery_saver ? "On (CPU throttling not applied)" : "Not requested"}</strong>
                 </div>
               </div>
             </div>
@@ -234,9 +234,9 @@ export default function LandingPage({
 
           <div className="feature-card">
             <div className="feature-icon icon-amber"><Wifi size={20} /></div>
-            <h3>Scoped Emulator Network Controls</h3>
+            <h3>Indian Network Conditions</h3>
             <p>
-              Selected emulator latency and bandwidth controls can be applied and read back by a configured worker. Packet loss and outage recovery are unsupported; fixture proxy evidence does not prove arbitrary APK traffic fidelity.
+              Latency, bandwidth, packet loss, connection resets and full outages are applied through a shaping proxy, then compared against a baseline run. Each report says whether the app's traffic went through the proxy.
             </p>
           </div>
 

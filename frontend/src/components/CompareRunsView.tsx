@@ -7,15 +7,18 @@ interface CompareRunsViewProps {
   onBack: () => void;
 }
 
-export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) {
-  const [baselineId, setBaselineId] = useState<string>(() => {
-    const base = runs.find((r) => r.persona_id === "baseline");
-    return base ? base.id : runs[0]?.id || "";
-  });
-  const [constrainedId, setConstrainedId] = useState<string>(() => {
-    const constr = runs.find((r) => r.persona_id !== "baseline");
-    return constr ? constr.id : runs[1]?.id || "";
-  });
+function defaultPair(runs: Run[]): [string, string] {
+  // Only completed runs carry a report that can be compared.
+  const done = runs.filter((r) => r.status === "completed");
+  const base = done.find((r) => r.persona_id === "baseline") || done[1] || done[0];
+  const constrained = done.find((r) => r.id !== base?.id && r.persona_id !== "baseline") || done.find((r) => r.id !== base?.id);
+  return [base?.id || "", constrained?.id || ""];
+}
+
+export default function CompareRunsView({ runs: allRuns, onBack }: CompareRunsViewProps) {
+  const runs = allRuns.filter((r) => r.status === "completed");
+  const [baselineId, setBaselineId] = useState<string>(() => defaultPair(allRuns)[0]);
+  const [constrainedId, setConstrainedId] = useState<string>(() => defaultPair(allRuns)[1]);
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +26,10 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
   const handleCompare = async () => {
     if (!baselineId || !constrainedId) {
       setError("Please select both a baseline and a constrained run to compare.");
+      return;
+    }
+    if (baselineId === constrainedId) {
+      setError("Choose two different runs to compare.");
       return;
     }
     setLoading(true);
@@ -37,11 +44,21 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
     }
   };
 
+  // Runs can arrive after the first render; pick a default pair once they do.
   useEffect(() => {
-    if (baselineId && constrainedId) {
+    if (!baselineId && !constrainedId && allRuns.length) {
+      const [b, c] = defaultPair(allRuns);
+      setBaselineId(b);
+      setConstrainedId(c);
+    }
+  }, [allRuns, baselineId, constrainedId]);
+
+  useEffect(() => {
+    if (baselineId && constrainedId && baselineId !== constrainedId && !result && !loading) {
       void handleCompare();
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baselineId, constrainedId]);
 
   return (
     <div className="panel full-panel compare-view-panel">
@@ -53,7 +70,7 @@ export default function CompareRunsView({ runs, onBack }: CompareRunsViewProps) 
           <div className="section-kicker">COMPARATIVE TELEMETRY</div>
           <h2>Baseline vs. Constrained Anomaly Regression</h2>
           <p>
-            Evaluate performance degradation by comparing your app under normal conditions (Android 14, 6GB RAM, 4G) versus a target BharatSim constrained persona.
+            Compare two completed runs: cold start, janky frames and memory from each run's persona leg. Every run also has its own baseline on the run page.
           </p>
         </div>
         <div className="panel-icon">

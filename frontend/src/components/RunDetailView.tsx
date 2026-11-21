@@ -17,6 +17,7 @@ import {
   Wifi
 } from "lucide-react";
 import EvidenceSynthesisPanel from "./EvidenceSynthesisPanel";
+import EngineReportView, { isEngineReport } from "./EngineReportView";
 import RunComparisonModal from "./RunComparisonModal";
 import {
   api,
@@ -402,6 +403,8 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
               : "Execution waits until an authenticated, isolated Android worker executes the test."}
           </p>
         </div>
+      ) : isEngineReport(report) ? (
+        <EngineReportView report={report as unknown as Record<string, unknown>} runId={run.id} />
       ) : (
         <div className="run-evidence-body">
           {report.diagnostics ? <EvidenceSynthesisPanel diagnostics={report.diagnostics} /> : null}

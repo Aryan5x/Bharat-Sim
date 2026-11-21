@@ -82,7 +82,7 @@ export default function SarvamAudioPlayer({
     setLoading(true);
     setError(null);
     try {
-      const response = await synthesizeSpeechAudio(text.slice(0, 500), lang);
+      const response = await synthesizeSpeechAudio((text || "").slice(0, 500), lang);
 
       // The API deliberately returns an explicitly marked silent fixture when
       // SARVAM_API_KEY is absent. Never present that fixture as spoken output.
@@ -153,7 +153,7 @@ export default function SarvamAudioPlayer({
           type="button"
           className={"audio-play-button " + (playing ? "playing" : "")}
           onClick={() => void handlePlay()}
-          disabled={ttsAvailable !== true || loading || !text.trim()}
+          disabled={ttsAvailable !== true || loading || !(text || "").trim()}
           title={ttsAvailable === true ? (playing ? "Pause briefing" : "Generate and play voice briefing") : "Sarvam speech generation is not configured"}
         >
           {loading ? (

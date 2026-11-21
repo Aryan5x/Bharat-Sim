@@ -15,6 +15,8 @@ export type Capabilities = {
   persona_condition_simulation: {
     supported: string[]; control_plane_verifiable: string[]; report_only: string[]; unsupported: string[]; scope: string;
   };
+  engine_worker?: { requested_by_persona: string[]; not_applied: string[]; measurements: string[]; scope: string };
+  authenticated?: boolean;
   notes: string[];
 };
 
@@ -60,8 +62,10 @@ export type Finding = {
   sarvam_explanation?: {
     root_cause: string;
     impact: string;
-    remediation: string;
+    remediation?: string;
+    developer_fix?: string;
     defensive_code?: string;
+    code_remedy?: string;
     hindi_explanation?: string;
   };
 };
@@ -102,6 +106,8 @@ export type Run = {
   apk_sha256?: string;
   persona_id: string;
   error?: string;
+  readiness_score?: number | null;
+  readiness_status?: string | null;
 };
 
 export type Worker = {
@@ -434,7 +440,7 @@ export function cls(v: string): string {
 }
 
 export function displayRunStatus(status: string): string {
-  if (status === "completed") return "smoke completed";
+  if (status === "completed") return "completed";
   if (status === "awaiting_worker") return "awaiting worker";
   if (status === "queued") return "queued for worker";
   if (status === "leased") return "worker running";

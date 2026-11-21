@@ -1584,10 +1584,31 @@ def list_runs(request: Request, limit: int = 25):
     limit = max(1, min(limit, 100))
     with db() as conn:
         if AUTH_REQUIRED:
-            rows = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,error FROM runs WHERE owner_id=? ORDER BY created_at DESC LIMIT ?", (request.state.owner_id, limit)).fetchall()
+            rows = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,error,result_json FROM runs WHERE owner_id=? ORDER BY created_at DESC LIMIT ?", (request.state.owner_id, limit)).fetchall()
         else:
-            rows = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,error FROM runs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
-    return {"items": [dict(row) for row in rows]}
+            rows = conn.execute("SELECT id,created_at,status,apk_name,apk_sha256,persona_id,error,result_json FROM runs ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    return {"items": [_run_list_item(dict(row)) for row in rows]}
+
+
+def _is_engine_report(report: Any) -> bool:
+    """Engine reports carry their own readiness analysis; smoke-report fusion does not apply."""
+    return isinstance(report, dict) and bool(report.get("engine")) and isinstance(report.get("readiness"), dict)
+
+
+def _run_list_item(row: dict[str, Any]) -> dict[str, Any]:
+    """List rows carry the readiness score, never the full report."""
+    raw = row.pop("result_json", None)
+    row["readiness_score"] = None
+    row["readiness_status"] = None
+    if raw:
+        try:
+            readiness = (json.loads(raw) or {}).get("readiness") or {}
+            if isinstance(readiness.get("overall"), (int, float)):
+                row["readiness_score"] = round(readiness["overall"])
+                row["readiness_status"] = readiness.get("status")
+        except (ValueError, TypeError, AttributeError):
+            pass
+    return row
 
 def require_worker_token(request: Request) -> None:
     """Authenticate a separately deployed worker with a high-entropy shared secret."""
@@ -1997,7 +2018,7 @@ def export_run_report(run_id: str, request: Request):
     if not row["result_json"]:
         raise HTTPException(status_code=409, detail="No worker report is available for this run yet")
     report = json.loads(row["result_json"])
-    diagnostics = fuse_worker_report(report)
+    diagnostics = None if _is_engine_report(report) else fuse_worker_report(report)
     canonical_report = json.dumps(report, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     canonical_diagnostics = json.dumps(diagnostics, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     export = {
@@ -2046,7 +2067,7 @@ def get_run(run_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Run not found")
     result = dict(row)
     result["result"] = json.loads(result.pop("result_json")) if result.get("result_json") else None
-    if isinstance(result["result"], dict):
+    if isinstance(result["result"], dict) and not _is_engine_report(result["result"]):
         result["result"]["diagnostics"] = fuse_worker_report(result["result"])
     return result
 
@@ -2238,6 +2259,18 @@ def compare_runs(payload: CompareRunsRequest, request: Request):
 
     def telemetry(report):
         values = {}
+        if isinstance(report.get("readiness"), dict) and isinstance(report.get("constrained"), dict):
+            # Engine reports: compare the persona (constrained) leg of each run.
+            leg = report["constrained"]
+            for key, value in (
+                ("cold_start_ms", leg.get("cold_start_ms_median")),
+                ("jank_percentage", (leg.get("frames") or {}).get("jank_percent")),
+                ("peak_memory_mb", (leg.get("memory") or {}).get("pss_mb")),
+            ):
+                parsed = number(value)
+                if parsed is not None:
+                    values[key] = parsed
+            return values
         startup = number(report.get("startup_latency_ms"))
         if startup is not None:
             values["cold_start_ms"] = startup
@@ -2393,13 +2426,36 @@ def _capabilities_payload():
             "unsupported": ["packet_loss", "cpu_constraint"],
             "scope": "Worker executes conditions on disposable Android Emulator targets only; active data-plane app traffic is unverified",
         },
+        "engine_worker": {
+            "requested_by_persona": [
+                "network_latency", "download_bandwidth", "upload_bandwidth", "packet_loss",
+                "connection_resets", "network_outage_and_recovery", "battery_saver", "storage_pressure",
+                "screen_size", "cpu_cores", "ram_limit",
+            ],
+            "not_applied": ["cpu_throttling"],
+            "measurements": [
+                "cold_start_x3", "monkey_exploration", "gfxinfo_frames", "meminfo_pss", "logcat_signals",
+                "ml_failure_classification", "baseline_comparison", "anomaly_detection", "readiness_score",
+            ],
+            "scope": (
+                "Applies when the worker runs in engine mode (BHARATSIM_WORKER_ENGINE=engine). Network limits go through a host "
+                "shaping proxy set as the emulator's system proxy, and each report states whether the app's traffic actually "
+                "passed through it. RAM is capped only below 2 GB (in-guest balloon) or at 3-4 GB (AVD restart); a 2 GB "
+                "persona uses the 2 GB emulator as is. CPU throttling is not applied."
+            ),
+        },
         "sarvam_translation": sarvam_configured,
         "notes": [
-            "Production worker dispatch remains disabled until BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED, BHARATSIM_WORKER_ISOLATION_ATTESTED, and BHARATSIM_WORKER_EGRESS_RESTRICTED are all true. These flags are operator attestations, not cryptographic proof; independently verify the disposable VM and egress policy before enabling them.",
+            (
+                "Worker dispatch is enabled: the operator has attested worker isolation and egress restriction. These flags are "
+                "operator attestations, not cryptographic proof."
+                if worker else
+                "Production worker dispatch remains disabled until BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED, BHARATSIM_WORKER_ISOLATION_ATTESTED, and BHARATSIM_WORKER_EGRESS_RESTRICTED are all true. These flags are operator attestations, not cryptographic proof; independently verify the disposable VM and egress policy before enabling them."
+            ),
             "Worker dispatch is configured only when BHARATSIM_WORKER_TOKEN is set and the production safety gate is open; android_execution remains false here because this API cannot prove a live emulator has executed an APK. Check /api/v1/workers for recent worker heartbeats.",
-            "The worker supports Android Emulator console latency and bandwidth controls plus reversible battery-saver and bounded storage-pressure simulation with readback/reset evidence. Full persona shaping remains false because packet loss, CPU throttling, RAM restriction, outage/recovery, and arbitrary-app traffic verification are not supported.",
+            "In engine mode the worker runs each APK twice on the emulator (baseline, then the persona) and requests latency, bandwidth, packet loss, resets and outages through a host shaping proxy, plus battery saver, storage pressure, screen, cores and RAM where the emulator allows it. Each report records what was applied and whether app traffic went through the proxy. CPU throttling is not applied. The legacy smoke worker supports emulator console latency and bandwidth plus battery-saver and storage-pressure simulation only.",
             "Sarvam translation and Bulbul speech are available only when SARVAM_API_KEY is configured; only user-selected bounded text is sent to the provider.",
-            "When private Storage is configured, APK bytes use short-lived signed uploads directly to Supabase Storage, bypassing Vercel function request-body limits. The API verifies the stored object size before queueing.",
+            "When private Storage is configured, APK bytes use short-lived signed uploads directly to Supabase Storage, bypassing API request-body limits. The API verifies the stored object size before queueing.",
             "Worker result payloads are bounded and protected by lease tokens; inline artifact payloads are limited to 250 KB.",
         ],
     }

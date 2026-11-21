@@ -23,7 +23,7 @@ describe("api helper utilities", () => {
   });
 
   it("formats run statuses cleanly", () => {
-    expect(displayRunStatus("completed")).toBe("smoke completed");
+    expect(displayRunStatus("completed")).toBe("completed");
     expect(displayRunStatus("awaiting_worker")).toBe("awaiting worker");
     expect(displayRunStatus("queued")).toBe("queued for worker");
     expect(displayRunStatus("leased")).toBe("worker running");

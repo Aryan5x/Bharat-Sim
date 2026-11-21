@@ -95,10 +95,49 @@ EVALUATOR_SCENARIOS = {
 }
 
 
+# Display fields the dashboard's Evaluator Tour reads (name, expected failure,
+# ML category, headline metrics and a short Indic briefing).
+_DISPLAY = {
+    "fintech-upi-timeout": {
+        "expected_ml_category": "network",
+        "sarvam_insight": {
+            "hi": "ग्रामीण 2G नेटवर्क पर UPI भुगतान की पुष्टि 15 सेकंड बाद टाइमआउट हो गई। अनुरोध को बैकऑफ़ के साथ दोबारा भेजें और टाइमआउट बढ़ाएँ ताकि भुगतान पूरा हो सके।",
+            "en": "On a rural 2G connection the UPI authorization timed out after 15 s. Retry with backoff and a longer timeout so the payment can complete.",
+        },
+    },
+    "quick-commerce-oom": {
+        "expected_ml_category": "oom",
+        "sarvam_insight": {
+            "hi": "2 GB RAM वाले फ़ोन पर बड़ी बैनर इमेज लोड करते समय ऐप की मेमोरी खत्म हो गई और सिस्टम ने ऐप बंद कर दिया। इमेज को स्क्रीन के आकार में छोटा करके डिकोड करें।",
+            "en": "On a 2 GB RAM phone, decoding a full-size banner image ran the app out of memory and the system killed it. Decode images at display size.",
+        },
+    },
+}
+
+
+def _with_display(scenario: dict[str, Any]) -> dict[str, Any]:
+    constrained = scenario.get("constrained_telemetry") or {}
+    extra = _DISPLAY.get(scenario["id"], {})
+    return {
+        **scenario,
+        "name": scenario.get("title", scenario["id"]),
+        "expected_failure": scenario.get("simulated_failure", ""),
+        "expected_ml_category": extra.get("expected_ml_category", "other"),
+        "metrics": {
+            "cold_start_ms": constrained.get("cold_start_ms"),
+            "jank_frame_pct": constrained.get("jank_percentage"),
+            "memory_peak_mb": constrained.get("peak_memory_mb"),
+            "network_latency_ms": constrained.get("network_latency_ms"),
+        },
+        "sarvam_insight": extra.get("sarvam_insight", {"hi": "", "en": scenario.get("description", "")}),
+    }
+
+
 def get_all_scenarios() -> list[dict[str, Any]]:
-    return list(EVALUATOR_SCENARIOS.values())
+    return [_with_display(s) for s in EVALUATOR_SCENARIOS.values()]
 
 
 def get_scenario_by_id(scenario_id: str) -> dict[str, Any] | None:
-    return EVALUATOR_SCENARIOS.get(scenario_id)
+    scenario = EVALUATOR_SCENARIOS.get(scenario_id)
+    return _with_display(scenario) if scenario else None
 

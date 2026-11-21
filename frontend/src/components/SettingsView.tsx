@@ -161,7 +161,7 @@ export default function SettingsView({ capabilities, apiStatus }: SettingsViewPr
             </div>
             <div className="info-row">
               <span>APK Execution:</span>
-              <b>{capabilities?.android_execution ? "Enabled" : "Disabled until isolated worker verification"}</b>
+              <b>{capabilities?.android_execution || capabilities?.worker_dispatch ? "Enabled · runs on an attested Android emulator worker" : "Disabled until isolated worker verification"}</b>
             </div>
           </div>
         </section>

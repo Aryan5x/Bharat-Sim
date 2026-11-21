@@ -4,6 +4,11 @@ type PdfLine = { text: string; bold?: boolean; size?: number };
 
 function ascii(value: unknown): string {
   return String(value ?? "")
+    .replace(/[·•]/g, "-")
+    .replace(/[–—]/g, "-")
+    .replace(/→/g, "->")
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
     .normalize("NFKD")
     .replace(/[^\x20-\x7E]/g, "?")
     .replace(/\s+/g, " ")
@@ -88,7 +93,8 @@ function buildLines(report: Analysis): PdfLine[] {
       add("Source evidence:", { bold: true });
       evidence.slice(0, 12).forEach(item => add("Line " + item.line + ": " + item.text));
     }
-    if (finding.sarvam_explanation?.remediation) add("Developer guidance: " + finding.sarvam_explanation.remediation);
+    const guidance = finding.sarvam_explanation?.developer_fix || finding.sarvam_explanation?.remediation;
+    if (guidance) add("Developer guidance: " + guidance);
     blank();
   });
 
@@ -123,7 +129,10 @@ function buildPageContent(lines: PdfLine[], pageNumber: number, pageCount: numbe
 
 /** Create a dependency-free, valid PDF from the current analysis result. */
 export function createAnalysisPdf(report: Analysis): Blob {
-  const allLines = buildLines(report);
+  return linesToPdf(buildLines(report));
+}
+
+function linesToPdf(allLines: PdfLine[]): Blob {
   const pageSize = 49;
   const pages: PdfLine[][] = [];
   for (let index = 0; index < allLines.length; index += pageSize) {
@@ -170,5 +179,102 @@ export function downloadAnalysisPdf(report: Analysis): void {
   anchor.href = url;
   anchor.download = "bharatsim-analysis-" + report.id.slice(0, 8) + ".pdf";
   anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function buildEngineLines(runId: string, report: Record<string, any>): PdfLine[] {
+  const lines: PdfLine[] = [];
+  const add = (value: unknown, options: Omit<PdfLine, "text"> = {}) => {
+    for (const text of wrap(value)) lines.push({ text, ...options });
+  };
+  const blank = () => lines.push({ text: "" });
+  const r = report.readiness || {};
+  const base = report.baseline || {};
+  const cons = report.constrained || {};
+  const applied = cons.conditions_applied || {};
+  const net = applied.network || {};
+  const label = cons.label || report.persona?.name || "Persona";
+  const v = (x: unknown, unit = "") => (typeof x === "number" ? x.toLocaleString("en-US", { maximumFractionDigits: 1 }) + (unit ? " " + unit : "") : "-");
+
+  blank();
+  add("EMULATOR TEST REPORT", { bold: true, size: 12 });
+  add("Real Android emulator run: baseline vs selected persona.", { size: 9 });
+  blank();
+  add("RUN", { bold: true, size: 11 });
+  add("Run ID: " + runId);
+  add("App: " + (report.apk?.label || "-") + " (" + (report.apk?.package || "-") + ") version " + (report.apk?.version_name || "-"));
+  add("APK SHA-256: " + (report.apk_sha256 || "-"));
+  add("Persona: " + label + (report.persona?.device ? " - " + report.persona.device : ""));
+  add("Engine: " + report.engine + " | Started: " + (report.execution?.started_at || "-") + " | Finished: " + (report.execution?.finished_at || "-"));
+  blank();
+  add("BHARAT READINESS SCORE", { bold: true, size: 11 });
+  add("Score: " + (r.overall ?? "-") + " / 100 - " + String(r.status || "unknown").toUpperCase(), { bold: true });
+  for (const [key, cat] of Object.entries<any>(r.categories || {})) {
+    add(key + ": " + cat.score + "/100 (" + cat.status + ", weight " + (r.weights?.[key] ?? "-") + "%) - " + cat.why);
+  }
+  add("Method: " + (r.methodology || "-"));
+  blank();
+  add("BASELINE VS " + String(label).toUpperCase(), { bold: true, size: 11 });
+  const rows: Array<[string, unknown, unknown, string]> = [
+    ["Median cold start", base.cold_start_ms_median, cons.cold_start_ms_median, "ms"],
+    ["Janky frames", base.frames?.jank_percent, cons.frames?.jank_percent, "%"],
+    ["Frame time p90", base.frames?.frame_p90_ms, cons.frames?.frame_p90_ms, "ms"],
+    ["Memory PSS", base.memory?.pss_mb, cons.memory?.pss_mb, "MB"],
+    ["Crashes", base.signals?.crashes, cons.signals?.crashes, ""],
+    ["ANRs", base.signals?.anrs, cons.signals?.anrs, ""],
+    ["Out-of-memory", base.signals?.ooms, cons.signals?.ooms, ""],
+    ["Low-memory kills", base.signals?.lmk_kills, cons.signals?.lmk_kills, ""],
+    ["Network failure lines", base.signals?.network_errors, cons.signals?.network_errors, ""],
+    ["Storage failure lines", base.signals?.storage_errors, cons.signals?.storage_errors, ""]
+  ];
+  for (const [name, b, p, unit] of rows) add(name + ": baseline " + v(b, unit) + " | persona " + v(p, unit));
+  if (cons.drop) {
+    add("Outage test: " + cons.drop.seconds + " s airplane mode - app " + cons.drop.behaviour +
+      (cons.drop.recovery_seconds != null ? ", back in foreground after " + cons.drop.recovery_seconds + " s" : ", did not recover within 30 s"));
+  }
+  blank();
+  add("FINDINGS", { bold: true, size: 11 });
+  const findings = [...(cons.findings || []).map((f: any) => ({ ...f, run: label })), ...(base.findings || []).map((f: any) => ({ ...f, run: "Baseline" }))];
+  if (!findings.length) add("No crash, ANR, out-of-memory, network or storage failure lines were found in the app log on either run.");
+  findings.forEach((f: any, i: number) => {
+    add((i + 1) + ". [" + String(f.severity || "").toUpperCase() + "] " + f.message + " (" + f.run + ", confidence " + Math.round((f.confidence || 0) * 100) + "%)", { bold: true });
+    add("Fix: " + f.fix);
+    (f.evidence || []).slice(0, 6).forEach((line: string) => add("  " + line));
+  });
+  blank();
+  add("ANOMALY DETECTION", { bold: true, size: 11 });
+  for (const a of report.anomalies || []) {
+    add(a.metric + " - " + a.method + ": " + (a.regression ? "REGRESSION" : "ok"));
+  }
+  blank();
+  add("CONDITIONS APPLIED (READ BACK)", { bold: true, size: 11 });
+  add("Device: Android " + (applied.device?.android || "-") + ", " + v(applied.device?.ram_mb_reported, "MB") + " RAM, " + (applied.device?.cpu_cores ?? "-") + " cores");
+  add("Network: " + (net.down_kbps ? v(net.down_kbps) + "/" + v(net.up_kbps) + " kbps" : "unshaped") +
+    (Array.isArray(net.delay_ms) ? ", " + net.delay_ms[0] + "-" + net.delay_ms[1] + " ms" : "") +
+    (net.packet_loss_pct ? ", " + net.packet_loss_pct + "% loss" : "") + (net.enforced_by ? " via " + net.enforced_by : ""));
+  add("Battery saver: " + (applied.battery_saver || "off") + " | Free storage: " + (applied.free_storage_mb != null ? applied.free_storage_mb + " MB" : "not limited"));
+  if (report.constraint_verification) add("Traffic check: " + report.constraint_verification);
+  blank();
+  add("LIMITS", { bold: true, size: 11 });
+  add(report.result_interpretation || "");
+  if (report.ml?.caveat) add("Classifier: " + report.ml.caveat);
+  add("A clean log is not proof the app is healthy; automated exploration covers only part of the app.");
+  return lines;
+}
+
+export function createEngineRunPdf(runId: string, report: Record<string, any>): Blob {
+  return linesToPdf(buildEngineLines(runId, report));
+}
+
+export function downloadEngineRunPdf(runId: string, report: Record<string, any>): void {
+  const blob = createEngineRunPdf(runId, report);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "bharatsim-run-" + runId.slice(0, 8) + ".pdf";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
