@@ -117,3 +117,50 @@ These cannot be closed by source changes alone.
 - "ML and anomaly outputs are triage signals, not confirmed root causes or production field-accuracy guarantees."
 
 Do not describe the project as fully production-ready until the acceptance evidence above exists. This is an engineering release gate, not a judgement of the project's potential.
+
+
+## 7. Follow-up live inventory — 22 Nov 2026
+
+This section records read-only inspection of the connected Vercel, Render and Supabase control planes. It does not claim that masked credentials were tested or that production configuration was changed.
+
+### Supabase project identity and migration drift
+
+- The Vercel project `bharat-sim-81g2` has a Production/Preview browser variable `VITE_SUPABASE_URL` pointing to project reference `gpkyzastnibffyuxhtix`.
+- The Supabase account currently connected to this audit exposes a different active project, `common 1` (`hkyieaovolkethovyenb`). The browser project reference is not in the connected account's project inventory, so the browser Auth/Storage target cannot be reconciled from this connection alone.
+- The active `common 1` database contains both `bharatsim` and `genomeguard` schemas. Its migration history includes the BharatSim core, FK indexes, private APK bucket and signed-upload-size migrations, but not the five newer BharatSim migrations currently in the repository (custom persona, worker claiming/status, run scenario, large APK parts, personal workers).
+- The live `bharatsim.runs` table does not currently expose the `persona_json` and `scenario_json` columns expected by the newer code path. The live worker table also predates the newer worker-claiming fields.
+- Vercel metadata confirms a Production `BHARATSIM_DATABASE_URL` entry and server-side `SUPABASE_URL` entry exist, but their values were deliberately not retrieved. Their actual targets and connectivity remain unverified.
+
+**Decision:** Do not apply the five pending migrations to `common 1` until the owner confirms that it is the intended BharatSim database and approves a backup/restore plan. It is shared with GenomeGuard; a blind migration push could affect another product. First reconcile the browser Auth/Storage project with the backend database target.
+
+### Production execution and worker gates
+
+Vercel's non-secret Production/Preview configuration currently records:
+- `BHARATSIM_ENV=production`
+- `BHARATSIM_AUTH_REQUIRED=true`
+- `BHARATSIM_STORAGE_BUCKET=bharatsim-private`
+- `BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED=false`
+- `BHARATSIM_WORKER_ISOLATION_ATTESTED=false`
+- `BHARATSIM_WORKER_EGRESS_RESTRICTED=false`
+
+These are appropriate fail-closed settings while production worker isolation and egress evidence are absent. Do not flip them to enable public APK execution as a shortcut.
+
+The connected Render workspace still has legacy `bharatsim-api` and `bharatsim-web` services deployed from `main`; the latest recorded API deployment is from 2 Nov 2026. No dedicated Android worker service is present in the listed Render services. Treat those as legacy split services, not proof of the current unified Vercel release or of a production emulator worker.
+
+### Latest Android CI failure and correction
+
+The Android smoke workflow on PR head `7ca29fa1` completed with failure in the Appium traffic journey. The API worker successfully registered and completed the controlled APK smoke run; the later Appium fixture then failed when the Android app attempted to connect to host gateway `10.0.2.2:8888`, receiving `ENETUNREACH`.
+
+The preflight previously treated an active ConnectivityManager transport as sufficient readiness. That is weaker than proving the emulator can route to the host and reach the proxy.
+
+**Branch correction:** `prepare_proxy_path()` now requires (1) an active Android transport, (2) an IP route to `10.0.2.2`, and (3) a successful TCP connection to `10.0.2.2:8888` before Appium begins. Regression tests cover delayed route/proxy readiness. The rerun must pass before this gate can be closed.
+
+### Other acceptance evidence that is still absent
+
+- **Private APK retention:** unit tests cover signed resumable upload behavior and tampered URL rejection; no production private-bucket upload → hash verify → signed download → delete round trip has been accepted.
+- **Tenant isolation:** source-level owner checks and RLS exist, but no live two-account matrix has proved cross-user read/write/delete denial across run history, reports, artifacts and signed URLs.
+- **Sarvam:** mocked provider tests verify request construction and error handling. A live provider result is required before claiming production translation/TTS availability. Fallback fixtures must be labelled as fallback, not real Sarvam output.
+- **ML classifier:** the checked-in TF-IDF centroid/softmax model is an implementation artifact, not independent accuracy evidence. Publish a leakage-free labelled holdout, per-class precision/recall/F1, confusion matrix, calibration check and model version before quoting accuracy.
+- **Failure DNA and FixProof:** repeat-run stability and same-scenario before/after comparison need persisted, completed runs and evidence-based acceptance; UI availability alone is insufficient.
+- **Accessibility:** automated responsive assertions are not a substitute for keyboard-only, screen-reader, contrast, focus-order and reduced-motion manual review.
+
