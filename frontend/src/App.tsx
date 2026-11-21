@@ -141,7 +141,10 @@ export default function App() {
         ]);
         setRuns(runResult.status === "fulfilled" ? runResult.value.items : []);
         setWorkers(workerResult.status === "fulfilled" ? workerResult.value.items : []);
-        if (capabilityContract.database_persistence !== true) {
+        if (capabilityContract.authenticated === false) {
+          // Signed-out visitors only see the public capability summary; nothing is misconfigured.
+          setNotice("");
+        } else if (capabilityContract.database_persistence !== true) {
           setNotice("Persistent PostgreSQL is not configured. Risk planning and pasted-log analysis work, but run history, APK registration, and saved reports are unavailable.");
         } else if (runResult.status === "rejected" || workerResult.status === "rejected") {
           setNotice("Some operational data is temporarily unavailable. Refresh to retry.");

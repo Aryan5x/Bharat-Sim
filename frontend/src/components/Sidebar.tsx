@@ -192,6 +192,8 @@ export default function Sidebar({
               <small>
                 {previewMode
                   ? "Operational"
+                  : !session
+                  ? "Sign in to see status"
                   : isOnline
                   ? `${onlineWorkers.length} heartbeat(s)`
                   : "No recent heartbeat"}
