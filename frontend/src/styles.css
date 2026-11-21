@@ -3206,3 +3206,6 @@ svg { flex-shrink: 0; }
 .inference-text{margin-top:18px;text-align:center}
 .inference-text b{display:block;font:600 11px var(--mono);letter-spacing:1px;text-transform:uppercase;color:#34d399}
 .inference-text small{display:block;margin-top:6px;font-size:12px;color:var(--text-muted);max-width:380px}
+
+/* Keep visually-hidden labels inside scrolling tables (no page-wide horizontal scroll) */
+.table-wrap{position:relative}
