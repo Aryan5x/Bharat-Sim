@@ -173,7 +173,7 @@ test("dashboard remains usable at narrow mobile widths without horizontal overfl
 });
 
 
-test("API documentation link stays same-origin in production builds", async ({ page }) => {
+test("project documentation link points to the canonical GitHub README", async ({ page }) => {
   await installLocalWorkspaceSession(page);
   await page.goto("/");
   const docsLink = page.getByRole("link", { name: /Project documentation on GitHub/ });
