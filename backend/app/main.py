@@ -1640,6 +1640,15 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
             "ON CONFLICT(id) DO NOTHING",
             (payload.worker_id, now_text, "idle"),
         )
+        # Runs whose APK upload was verified while execution was still gated stay
+        # 'awaiting_worker'. Execution is now approved (checked above), so queue them.
+        # Only runs with a verified upload are promoted, never half-finished uploads.
+        conn.execute(
+            "UPDATE runs SET status='queued', updated_at=? WHERE status='awaiting_worker' "
+            "AND (apk_storage_path IS NOT NULL OR apk_path IS NOT NULL) "
+            "AND EXISTS (SELECT 1 FROM run_events e WHERE e.run_id=runs.id AND e.event_type='apk_upload_verified')",
+            (now_text,),
+        )
         expired_leases = conn.execute(
             "SELECT id,owner_id,worker_id,attempts FROM runs WHERE status='leased' AND lease_until < ?",
             (now_text,),
