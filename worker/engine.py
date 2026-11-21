@@ -82,6 +82,12 @@ def gfx(dev: Device, pkg: str) -> dict[str, Any]:
     p90 = re.search(r"90th percentile:\s*(\d+)ms", out)
     p99 = re.search(r"99th percentile:\s*(\d+)ms", out)
     frozen = re.search(r"Number Frozen Frames:\s*(\d+)", out) or re.search(r"Number Slow UI thread:\s*(\d+)", out)
+    frames = int(total.group(1)) if total else 0
+    if frames < 30:
+        # Too few frames (the app crashed, restarted or barely rendered): a percentage would mislead.
+        return {"total_frames": frames, "janky_frames": int(janky.group(1)) if janky else None, "jank_percent": None,
+                "insufficient_frames": True, "frame_p90_ms": int(p90.group(1)) if p90 else None,
+                "frame_p99_ms": int(p99.group(1)) if p99 else None, "source": "dumpsys gfxinfo", "at": utc()}
     return {
         "total_frames": int(total.group(1)) if total else None,
         "janky_frames": int(janky.group(1)) if janky else None,
@@ -115,7 +121,7 @@ def monkey(dev: Device, pkg: str, events: int, throttle: int, seed: int) -> dict
 
 
 def read_logcat(dev: Device) -> list[str]:
-    return dev.adb("logcat", "-d", "-v", "threadtime", "-b", "main,system,crash", timeout=60).splitlines()
+    return dev.adb("logcat", "-d", "-v", "threadtime", "-b", "main,system,crash,events", timeout=120).splitlines()
 
 
 def app_lines(lines: list[str], pkg: str, pids: set[int]) -> list[str]:
@@ -134,10 +140,12 @@ def count_signals(lines: list[str], pkg: str) -> dict[str, int]:
     crashes = len(re.findall(rf"Process: {re.escape(pkg)}, PID", text))
     anrs = len(re.findall(rf"ANR in {re.escape(pkg)}", text))
     ooms = len(re.findall(r"OutOfMemoryError", text))
+    # Low-memory killer evictions of the app (events buffer am_kill / lmkd lines).
+    lmk_kills = sum(1 for l in lines if re.search(r"am_kill|lmkd|lowmemorykiller", l) and pkg in l)
     network = sum(1 for l in lines if NETWORK_RE.search(l))
     storage = sum(1 for l in lines if re.search(r"ENOSPC|No space left|SQLiteFullException", l))
     displayed = re.findall(rf"Displayed {re.escape(pkg)}/\S+: \+(\d+)s?(\d+)?ms", text)
-    return {"crashes": crashes, "anrs": anrs, "ooms": ooms, "network_errors": network, "storage_errors": storage,
+    return {"crashes": crashes, "anrs": anrs, "ooms": ooms, "lmk_kills": lmk_kills, "network_errors": network, "storage_errors": storage,
             "displayed_events": len(displayed)}
 
 
@@ -169,6 +177,11 @@ def run_profile(dev: Device, shaper: Shaper, apk: Path, info: ApkInfo, activity:
     applied: dict[str, Any] = {}
     if profile.get("battery_saver"):
         applied["battery_saver"] = "on" if dev.battery_saver(True) else "requested, not confirmed"
+    if profile.get("ram_mb") and int(profile["ram_mb"]) < 2048:
+        applied["ram"] = dev.limit_ram(int(profile["ram_mb"]))
+    if profile.get("screen"):
+        sc = profile["screen"]
+        applied["screen"] = dev.set_screen(sc["width"], sc["height"], sc["density"])
     if profile.get("free_storage_mb"):
         free = dev.fill_storage(int(profile["free_storage_mb"]))
         applied["free_storage_mb"] = free
@@ -184,7 +197,9 @@ def run_profile(dev: Device, shaper: Shaper, apk: Path, info: ApkInfo, activity:
         "variable_kbps": profile.get("variable_kbps"),
         "enforced_by": "host shaping proxy (Android system proxy -> 10.0.2.2)",
     }
-    applied["device"] = {"ram_mb": 2048, "android": "11 (API 30)", "screen": "720x1280"}
+    hw = dev.hardware()
+    applied["device"] = {"ram_mb_reported": hw["ram_mb"], "cpu_cores": hw["cores"], "android": "11 (API 30)",
+                         "source": "/proc/meminfo, nproc"}
     result["conditions_applied"] = applied
 
     variable = profile.get("variable_kbps")
@@ -215,6 +230,7 @@ def run_profile(dev: Device, shaper: Shaper, apk: Path, info: ApkInfo, activity:
         time.sleep(cfg["settle_seconds"])
         mark("running automated exploration")
         result["exploration"] = monkey(dev, pkg, cfg["monkey_events"], cfg["monkey_throttle_ms"], cfg["monkey_seed"])
+        dev.collapse_overlays()
 
         # Network drop and recovery
         drop = int(profile.get("drop_seconds") or 0)
@@ -222,6 +238,9 @@ def run_profile(dev: Device, shaper: Shaper, apk: Path, info: ApkInfo, activity:
             mark(f"dropping the network for {drop} s")
             if dev.pid(pkg) is None:
                 cold_start(dev, pkg, activity)
+            else:
+                dev.shell(f"am start -n {pkg}/{activity}", 20)  # bring to the foreground without restarting
+            time.sleep(2)
             pid_before = dev.pid(pkg)
             dev.airplane(True)
             alive_during = True
@@ -234,11 +253,13 @@ def run_profile(dev: Device, shaper: Shaper, apk: Path, info: ApkInfo, activity:
             recovered_s = None
             for _ in range(30):
                 time.sleep(1)
+                dev.collapse_overlays()
                 if dev.pid(pkg) is not None and dev.focused_package() == pkg:
                     recovered_s = round(time.monotonic() - t0, 1)
                     break
             behaviour = "stayed open" if alive_during and dev.pid(pkg) == pid_before else "crashed or closed"
             result["drop"] = {"seconds": drop, "behaviour": behaviour, "recovery_seconds": recovered_s,
+                              "focused_after": dev.focused_package(),
                               "source": "cmd connectivity airplane-mode + pidof/dumpsys window", "at": utc()}
 
         mark("collecting telemetry")
@@ -383,12 +404,27 @@ def score(base: dict[str, Any], cons: dict[str, Any], cfg: dict[str, Any]) -> di
             pts = min(pts, 50)
         cats["startup"] = {"score": pts, "why": f"median cold start {med} ms vs baseline {bmed} ms"}
     # stability
-    pts = 100 - 60 * min(s.get("crashes", 0), 1) - 25 * max(0, s.get("crashes", 0) - 1) - 40 * min(s.get("anrs", 0), 1) - 30 * min(s.get("ooms", 0), 1)
-    cats["stability"] = {"score": max(0, pts), "why": f"{s.get('crashes', 0)} crash(es), {s.get('anrs', 0)} ANR(s), {s.get('ooms', 0)} OOM(s)"}
+    pts = (100 - 60 * min(s.get("crashes", 0), 1) - 25 * max(0, s.get("crashes", 0) - 1) - 40 * min(s.get("anrs", 0), 1)
+           - 30 * min(s.get("ooms", 0), 1) - 30 * min(s.get("lmk_kills", 0), 1))
+    if not cons.get("launched"):
+        pts = 0
+    cats["stability"] = {"score": max(0, pts), "why": f"{s.get('crashes', 0)} crash(es), {s.get('anrs', 0)} ANR(s), {s.get('ooms', 0)} OOM(s), {s.get('lmk_kills', 0)} low-memory kill(s)"}
     # UI
-    jank = cons.get("frames", {}).get("jank_percent")
-    cats["ui"] = {"score": 100 if jank is None else max(0, round(100 - max(0.0, jank - 5) * 2.5)),
-                  "why": "no frames rendered" if jank is None else f"{jank}% janky frames"}
+    frames = cons.get("frames", {})
+    jank = frames.get("jank_percent")
+    if jank is None:
+        cats["ui"] = {"score": 40 if not cons.get("launched") or s.get("crashes") else 70,
+                      "why": f"only {frames.get('total_frames', 0)} frames rendered, too few to measure jank"}
+    else:
+        # The emulator renders in software, which inflates absolute jank for every app,
+        # so score the persona's increase over the same app's baseline.
+        bjank = base.get("frames", {}).get("jank_percent")
+        if bjank is not None:
+            delta = jank - bjank
+            cats["ui"] = {"score": max(0, round(100 - max(0.0, delta) * 3)),
+                          "why": f"{jank}% janky frames vs {bjank}% on baseline ({delta:+.1f} points)"}
+        else:
+            cats["ui"] = {"score": max(0, round(100 - max(0.0, jank - 5) * 2.5)), "why": f"{jank}% janky frames"}
     # memory
     pss, bpss = cons.get("memory", {}).get("pss_mb"), base.get("memory", {}).get("pss_mb")
     mpts = 100
@@ -429,10 +465,11 @@ def execute(apk: Path, job: dict[str, Any], dev: Device, shaper: Shaper, stage: 
     digest = sha256_file(apk)
     info = apk_info(str(apk))
     stage("Provisioning emulator")
-    dev.wait_ready(60)
-    props = dev.props()
-    activity = info.launch_activity
+    dev.wait_ready(120)
     persona = job.get("persona_profile") or {}
+    hardware = dev.ensure_hardware(int(persona.get("ram_mb") or 2048), int(persona.get("cpu_cores") or 2), log=stage)
+    props = {**dev.props(), "hardware": hardware}
+    activity = info.launch_activity
     profiles = [
         {"key": "baseline", "label": "Baseline", "network_speed": "full", "network_delay": "none"},
         {"key": persona.get("id", "persona"), "label": persona.get("name", "Persona"),
@@ -440,7 +477,8 @@ def execute(apk: Path, job: dict[str, Any], dev: Device, shaper: Shaper, stage: 
          "network_delay": f"{persona['delay_ms'][0]}:{persona['delay_ms'][1]}" if persona.get("delay_ms") else "none",
          "packet_loss_pct": persona.get("packet_loss_pct", 0), "reset_pct": persona.get("reset_pct", 0),
          "variable_kbps": persona.get("variable_kbps"), "drop_seconds": persona.get("drop_seconds", 0),
-         "battery_saver": persona.get("battery_saver"), "free_storage_mb": persona.get("storage_free_mb") if persona.get("fill_storage") else None},
+         "battery_saver": persona.get("battery_saver"), "free_storage_mb": persona.get("storage_free_mb") if persona.get("fill_storage") else None,
+         "screen": persona.get("screen"), "ram_mb": persona.get("ram_mb")},
     ]
     results = {}
     for p in profiles:

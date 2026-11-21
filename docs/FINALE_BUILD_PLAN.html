@@ -64,24 +64,15 @@ tr:last-child td{border-bottom:0;}
 <li><span class="lead">Where you will be:</span> the exact features, flows and integrations working by 12 PM on 22 November.
   <ul>
     <li><b>Primary flow, live end to end:</b> sign up or sign in (Supabase Auth, password recovery) → drag-and-drop APK upload into private storage (signature, structure and size checks; package, version and min/target SDK extracted) → pick a persona → the job is queued → a worker runs it on a real Android 11 emulator (2 GB RAM, 720p) → live stages → a report comparing baseline and constrained runs</li>
-    <li><b>Personas applied for real:</b>
+    <li><b>Four preset personas, applied for real:</b> Budget Android (2 GB RAM, 720p, battery saver, low storage); Edge Village (about 450 ms latency, 8% loss emulated as TCP retransmission stalls and resets, 256 kbps, 15 s outage); Crowded Station (congested 3G); Congested Urban 4G (0.6 to 6 Mbps swings, resets, dropout). Shaping runs through a measured host-side proxy (EDGE verified at 480 kbps)</li>
+    <li><b>Custom persona builder:</b> users set their own test device and network.
       <ul>
-        <li><b>Budget Android:</b> 2 GB RAM, Android 11, 720p, battery saver, low storage</li>
-        <li><b>Edge Village:</b> about 450 ms latency, about 8% loss emulated as TCP retransmission stalls and resets, restricted bandwidth</li>
-        <li><b>Crowded Station:</b> congested 3G</li>
-        <li><b>Congested Urban 4G:</b> variable bandwidth with dropouts</li>
-      </ul>
-      Shaping runs through a measured host-side proxy (EDGE verified at 480 kbps in testing), with an airplane-mode drop and recovery</li>
-    <li><b>Telemetry (adb, dumpsys, gfxinfo, logcat), each value tied to its run and timestamp:</b>
-      <ul>
-        <li>cold start and time to first frame</li>
-        <li>jank and frame time</li>
-        <li>crashes, ANRs and OOMs</li>
-        <li>memory</li>
-        <li>network failures, timeouts and recovery time</li>
-        <li>data transferred</li>
-      </ul>
-      Automated exploration runs adb monkey restricted to the app</li>
+        <li>RAM (1 to 4 GB) and CPU cores, applied by restarting the emulator with those values</li>
+        <li>screen size and density (wm size, wm density), free storage, battery saver</li>
+        <li>bandwidth, latency range, loss %, connection resets and outage length</li>
+        <li>presets can be saved and reused; Android 11 only for now</li>
+      </ul></li>
+    <li><b>Telemetry, each value tied to its run, source command and timestamp:</b> cold start and first frame, jank and frame time, crashes, ANRs and OOMs, memory, network failures, timeouts, recovery time and data transferred; automated exploration runs adb monkey restricted to the app</li>
     <li><b>ML (scikit-learn):</b>
       <ul>
         <li>a TF-IDF + logistic regression failure classifier (crash, ANR, OOM, network, storage), trained by <i>scripts/train_classifier.py</i> on LogHub Android logs with versioned models and real held-out metrics</li>

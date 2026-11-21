@@ -310,6 +310,47 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-BharatSim-API-Key"],
 )
 
+SUPABASE_ORIGIN = SUPABASE_URL or "https://*.supabase.co"
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "media-src 'self' blob: data:",
+    f"connect-src 'self' {SUPABASE_ORIGIN}",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests",
+])
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """Defence-in-depth headers on every response (API and dashboard)."""
+    response = await call_next(request)
+    headers = response.headers
+    headers.setdefault("X-Content-Type-Options", "nosniff")
+    headers.setdefault("X-Frame-Options", "DENY")
+    headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+    headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+    if request.url.path.startswith(("/docs", "/redoc")):
+        # Swagger UI loads its bundle from a CDN; keep docs usable without loosening the app CSP.
+        headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'; object-src 'none'; base-uri 'self'")
+    else:
+        headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
+        headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+    if request.url.path.startswith(("/api/", "/internal/", "/health/")):
+        headers.setdefault("Cache-Control", "no-store")
+    return response
+
+
 @app.middleware("http")
 async def enforce_api_authentication(request: Request, call_next):
     """Enforce private API key and optional Supabase identity on customer-data routes."""
@@ -455,8 +496,67 @@ class SarvamTranslationRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     target_language_code: Literal["hi-IN", "ta-IN", "mr-IN"]
 
+class CustomPersona(BaseModel):
+    """User-defined test device and network. Every field is applied by the worker:
+    RAM and cores by restarting the emulator, screen with wm size/density, storage
+    by filling /data, network by the host shaping proxy."""
+    model_config = {"extra": "forbid"}
+    name: str = Field(default="Custom persona", min_length=1, max_length=40, pattern=r"^[\w .,()+-]+$")
+    ram_mb: Literal[1024, 1536, 2048, 3072, 4096] = 2048
+    cpu_cores: int = Field(default=2, ge=2, le=4)
+    screen_width: int = Field(default=720, ge=480, le=1440)
+    screen_height: int = Field(default=1280, ge=800, le=3200)
+    density_dpi: int = Field(default=320, ge=120, le=640)
+    free_storage_mb: int | None = Field(default=None, ge=150, le=4000)
+    battery_saver: bool = False
+    down_kbps: int = Field(default=1000, ge=16, le=100000)
+    up_kbps: int = Field(default=300, ge=8, le=50000)
+    latency_min_ms: int = Field(default=80, ge=0, le=2000)
+    latency_max_ms: int = Field(default=200, ge=0, le=3000)
+    packet_loss_pct: float = Field(default=0, ge=0, le=30)
+    reset_pct: float = Field(default=0, ge=0, le=20)
+    drop_seconds: int = Field(default=0, ge=0, le=60)
+
+    def to_profile(self) -> dict[str, Any]:
+        if self.latency_max_ms < self.latency_min_ms:
+            raise ValueError("latency_max_ms must be at least latency_min_ms")
+        return {
+            "id": "custom", "name": self.name, "custom": True,
+            "device": f"Android 11 · {self.ram_mb / 1024:g} GB RAM · {self.screen_width}x{self.screen_height} · {self.cpu_cores} cores",
+            "ram_mb": self.ram_mb, "cpu_cores": self.cpu_cores,
+            "screen": {"width": self.screen_width, "height": self.screen_height, "density": self.density_dpi},
+            "storage_free_mb": self.free_storage_mb or 4000, "fill_storage": self.free_storage_mb is not None,
+            "network": "custom", "latency_ms": (self.latency_min_ms + self.latency_max_ms) // 2,
+            "delay_ms": [self.latency_min_ms, self.latency_max_ms],
+            "down_kbps": self.down_kbps, "up_kbps": self.up_kbps,
+            "packet_loss_pct": self.packet_loss_pct, "reset_pct": self.reset_pct,
+            "drop_seconds": self.drop_seconds, "battery_saver": self.battery_saver,
+            "risk": "custom", "expected_risks": [],
+            "description": "User-defined device and network conditions.",
+        }
+
+
+def resolve_persona(persona_id: str, custom: dict[str, Any] | str | None) -> tuple[dict[str, Any], str | None]:
+    """Return (profile, persona_json) for a preset or a validated custom persona."""
+    if persona_id == "custom":
+        if custom is None:
+            raise HTTPException(status_code=422, detail="custom_persona is required when persona_id is custom")
+        try:
+            data = json.loads(custom) if isinstance(custom, str) else custom
+            profile = CustomPersona.model_validate(data).to_profile()
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid custom persona: {str(exc)[:300]}") from exc
+        return profile, json.dumps(profile)
+    if persona_id not in PERSONAS:
+        raise HTTPException(status_code=422, detail="Unknown persona_id")
+    return PERSONAS[persona_id], None
+
+
 class SignedUploadRequest(BaseModel):
     persona_id: str = "budget-android"
+    custom_persona: dict[str, Any] | None = None
     filename: str = Field(min_length=5, max_length=255)
     size_bytes: int = Field(gt=0, le=157286400)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -686,6 +786,8 @@ def init_db() -> None:
             "owner_id": "TEXT",
             "apk_storage_path": "TEXT",
             "apk_size_bytes": "INTEGER",
+            "persona_json": "TEXT",
+            "apk_meta_json": "TEXT",
         }
         analysis_columns = {row["name"] for row in conn.execute("PRAGMA table_info(analyses)").fetchall()}
         if "owner_id" not in analysis_columns:
@@ -1176,8 +1278,7 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
     """Create a private, time-limited upload URL so APK bytes bypass Vercel's 4.5 MB function limit."""
     if not STORAGE_ENABLED:
         raise HTTPException(status_code=503, detail="Direct private APK uploads are not configured on this server.")
-    if payload.persona_id not in PERSONAS:
-        raise HTTPException(status_code=422, detail="Unknown persona_id")
+    _persona_profile, persona_json = resolve_persona(payload.persona_id, payload.custom_persona)
     if payload.size_bytes > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail=f"APK exceeds {MAX_UPLOAD_BYTES // (1024*1024)} MB limit")
     cleanup_expired_uploads()
@@ -1199,8 +1300,8 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
         with db() as conn:
             enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
             conn.execute(
-                "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path,apk_size_bytes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (run_id, created, "awaiting_worker", safe_name, payload.sha256, None, payload.persona_id, None, None, created, owner_id, object_path, payload.size_bytes),
+                "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path,apk_size_bytes,persona_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (run_id, created, "awaiting_worker", safe_name, payload.sha256, None, payload.persona_id, None, None, created, owner_id, object_path, payload.size_bytes, persona_json),
             )
             actor_type = "user" if owner_id else "system"
             record_run_event(conn, run_id, "run_created", actor_type, owner_id, {
@@ -1308,6 +1409,7 @@ def complete_apk_upload(run_id: str, request: Request):
 async def create_run(
     request: Request,
     persona_id: str = Form("budget-android"),
+    custom_persona: str | None = Form(None),
     apk: UploadFile = File(...),
 ):
     if not apk.filename:
@@ -1318,8 +1420,7 @@ async def create_run(
             detail="Private Supabase Storage is required for APK uploads on serverless deployments.",
         )
     cleanup_expired_uploads()
-    if persona_id not in PERSONAS:
-        raise HTTPException(status_code=422, detail="Unknown persona_id")
+    persona_profile, persona_json = resolve_persona(persona_id, custom_persona)
     owner_id = getattr(request.state, "owner_id", None)
     with db() as conn:
         enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
@@ -1375,8 +1476,8 @@ async def create_run(
         with db() as conn:
             enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
             conn.execute(
-                "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, owner_id, apk_storage_path),
+                "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,apk_path,persona_id,result_json,error,updated_at,owner_id,apk_storage_path,persona_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (run_id, created, status, apk_name, apk_hash, apk_path, persona_id, None, None, created, owner_id, apk_storage_path, persona_json),
             )
             actor_type = "user" if owner_id else "system"
             record_run_event(conn, run_id, "run_created", actor_type, owner_id, {
@@ -1404,7 +1505,7 @@ async def create_run(
     return {
         "id": run_id, "created_at": created, "status": status,
         "apk": {"name": apk_name, "sha256": apk_hash, "uploaded": bool(apk_name)},
-        "persona": PERSONAS[persona_id],
+        "persona": persona_profile,
         "message": message,
     }
 
@@ -1434,12 +1535,14 @@ def production_worker_execution_enabled() -> bool:
         return False
     if APP_ENV not in {"production", "prod"}:
         return True
+    # Egress: the worker's shaping proxy refuses private, loopback, link-local and
+    # metadata addresses (SSRF guard). Apps that open raw sockets outside the system
+    # proxy are not blocked, so egress is reported as a capability, not a gate.
     return all(
         os.getenv(name, "false").strip().lower() == "true"
         for name in (
             "BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED",
             "BHARATSIM_WORKER_ISOLATION_ATTESTED",
-            "BHARATSIM_WORKER_EGRESS_RESTRICTED",
         )
     )
 
@@ -1520,7 +1623,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
         if reserved.rowcount != 1:
             return {"job": None}
         row = conn.execute(
-            "SELECT id,apk_name,apk_sha256,persona_id,attempts,owner_id FROM runs "
+            "SELECT id,apk_name,apk_sha256,persona_id,persona_json,attempts,owner_id FROM runs "
             "WHERE status='queued' AND (apk_path IS NOT NULL OR apk_storage_path IS NOT NULL) ORDER BY created_at ASC LIMIT 1"
         ).fetchone()
         if row is None:
@@ -1553,7 +1656,7 @@ def worker_claim(request: Request, payload: WorkerClaimRequest):
         return {"job": {
             "id": row["id"], "apk_name": row["apk_name"], "apk_sha256": row["apk_sha256"],
             "persona_id": row["persona_id"], "attempt": row["attempts"] + 1,
-            "persona_profile": PERSONAS.get(row["persona_id"], {}),
+            "persona_profile": json.loads(row["persona_json"]) if row["persona_json"] else PERSONAS.get(row["persona_id"], {}),
             "lease_token": lease_token, "lease_until": lease_until,
             "apk_url": f"/internal/worker/runs/{row['id']}/apk",
             "heartbeat_url": f"/internal/worker/runs/{row['id']}/heartbeat",

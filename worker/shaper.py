@@ -17,7 +17,9 @@ no traffic was seen.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import random
+import socket
 import threading
 import time
 from dataclasses import dataclass, field
@@ -40,6 +42,7 @@ class Counters:
     bytes_up: int = 0
     connections: int = 0
     refused: int = 0
+    blocked_private: int = 0
     loss_stalls: int = 0
     resets: int = 0
     hosts: set[str] = field(default_factory=set)
@@ -69,12 +72,30 @@ class Bucket:
             await asyncio.sleep(max(0.005, (piece - self.tokens) / self.rate))
 
 
+class EgressDenied(Exception):
+    pass
+
+
+async def resolve_public(host: str, port: int) -> str:
+    """Resolve a host and refuse private, loopback, link-local, multicast and
+    reserved targets, so an app under test cannot reach the worker's LAN, the
+    host machine or cloud metadata endpoints through the proxy (SSRF guard)."""
+    loop = asyncio.get_running_loop()
+    infos = await loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    for _family, _, _, _, addr in infos:
+        ip = ipaddress.ip_address(addr[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
+            raise EgressDenied(f"blocked non-public address for {host}")
+    return infos[0][4][0]
+
+
 class Shaper:
     def __init__(self, host: str = "127.0.0.1", port: int = 8899):
         self.host = host
         self.port = port
         self.shape = Shape()
         self.counters = Counters()
+        self.allow_private = False  # tests may enable this to reach a local API
         self._loop: asyncio.AbstractEventLoop | None = None
         self._writers: set[asyncio.StreamWriter] = set()
         self._down = Bucket(None)
@@ -145,12 +166,20 @@ class Shaper:
                 host, _, port = target.rpartition(":")
                 self.counters.hosts.add(host)
                 await self._delay(2)  # TCP + TLS handshakes
-                up_r, up_w = await asyncio.wait_for(asyncio.open_connection(host, int(port or 443)), timeout=20)
+                target_ip = host if self.allow_private else await resolve_public(host, int(port or 443))
+                up_r, up_w = await asyncio.wait_for(asyncio.open_connection(target_ip, int(port or 443)), timeout=20)
                 writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
                 await writer.drain()
                 await self._pipe_both(reader, writer, up_r, up_w)
             else:
                 await self._forward_http(method, target, head, reader, writer)
+        except EgressDenied:
+            self.counters.blocked_private += 1
+            try:
+                writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+                await writer.drain()
+            except Exception:
+                pass
         except Exception:
             try:
                 writer.write(b"HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n")
@@ -171,7 +200,8 @@ class Shaper:
         host, _, port = hostport.partition(":")
         self.counters.hosts.add(host)
         await self._delay(1)
-        up_r, up_w = await asyncio.wait_for(asyncio.open_connection(host, int(port or 80)), timeout=20)
+        target_ip = host if self.allow_private else await resolve_public(host, int(port or 80))
+        up_r, up_w = await asyncio.wait_for(asyncio.open_connection(target_ip, int(port or 80)), timeout=20)
         lines = head.decode("latin-1").split("\r\n")
         lines[0] = f"{method} /{path} HTTP/1.0"
         kept = [l for l in lines[1:] if l and not l.lower().startswith(("proxy-", "connection:"))]
