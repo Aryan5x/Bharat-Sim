@@ -31,3 +31,4 @@
 ### 1.4 Worker Protocol Authentication
 - **Worker Secret:** Workers must present `Authorization: Bearer <BHARATSIM_WORKER_TOKEN>` on all `/internal/worker/*` endpoints.
 - **Safety Gate:** The worker daemon requires three explicit flags (`BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true`, `ANDROID_SERIAL=<id>`, `BHARATSIM_WORKER_TOKEN=<token>`) before executing untrusted binaries on test hosts.
+

@@ -42,3 +42,4 @@ When running on emulators where root raw socket shaping is unavailable or unsupp
   network speed full
   ```
 - **Readback Verification:** The worker queries readback state (`network status` or `tc qdisc show`) to verify that the shaping parameters were actually received and active before initiating the APK test journey.
+

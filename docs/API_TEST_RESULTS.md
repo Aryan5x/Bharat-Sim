@@ -41,3 +41,4 @@
 1. **Malicious File Uploads:** Uploading `.exe`, `.tar`, corrupted ZIP, or Zip-Bomb APKs returns `415 Unsupported Media Type` without crashing server.
 2. **Missing Fields:** Empty payload to `/api/v1/plan` or `/api/v1/runs/compare` returns `422 Unprocessable Entity` with structured field errors.
 3. **Cross-Tenant IDOR:** Querying a run ID owned by User B while authenticated as User A returns `404 Not Found` (no metadata leakage).
+

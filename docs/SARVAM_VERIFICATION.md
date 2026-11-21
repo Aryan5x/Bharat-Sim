@@ -34,3 +34,4 @@ flowchart TD
 - **Translation Fallback:** When `SARVAM_API_KEY` is empty, returns high-quality pre-translated terms for Hindi, Tamil, and Marathi.
 - **TTS Audio Fallback:** When uncredentialed, generates a clean valid 44.1 kHz WAV audio header and fixture bytes, preventing player crashes in the browser.
 - **Frontend Player Integration:** `SarvamAudioPlayer.tsx` gracefully detects fallback fixtures, shows playback controls, and handles browser Web Audio API contexts cleanly.
+

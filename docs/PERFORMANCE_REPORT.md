@@ -40,3 +40,4 @@ Measured locally against FastAPI TestClient & in-memory SQLite:
 ## 3. Serverless Compatibility (Vercel)
 - Vercel Function payload size limit: **4.5 MB**.
 - For APKs larger than 4.5 MB, BharatSim automatically switches to the direct Supabase Storage signed TUS resumable upload path (`/api/v1/uploads/sign`), bypassing Vercel body limits completely.
+

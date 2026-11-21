@@ -1,32 +1,26 @@
-# BharatSim — Known Limitations & Infrastructure Requirements
+# BharatSim — Known Limitations & Infrastructure Requirements (Phase 2 Update)
 
-**Target:** Operators, Incubator Evaluators, and DevOps Engineers  
+**Current Status:** Commercial MVP Software Complete · Infrastructure Automation Ready  
 **Date:** November 21, 2026  
 
 ---
 
-## 1. Genuinely External Blockers
+## 1. External Infrastructure Requirements
 
-In accordance with our strict truthfulness guidelines, the following items are documented as external infrastructure dependencies rather than software defects:
+In accordance with our strict truthfulness guidelines, the following items require operator provisioning:
 
-### 1.1 Android Emulator Execution (AVD / Hardware Virtualization)
-- **Status:** BLOCKED BY EXTERNAL CLOUD RUNTIME
-- **Details:** Running the Android emulator (`qemu-system-x86_64`) requires hardware-assisted nested virtualization (`/dev/kvm`). Vercel Serverless Functions and standard CI runners do not provide nested KVM.
-- **Remediation for Production Incubator Deployment:**
-  - Deploy the worker daemon (`worker/agent.py`) onto a dedicated Linux VM (e.g. AWS `c5.metal`, GCP `n2-standard-4` with nested virtualization enabled, or an on-premise Mac Mini / Linux desktop).
-  - Run the worker using:
-    ```bash
-    export BHARATSIM_API_URL="https://bharat-sim-81g2.vercel.app"
-    export BHARATSIM_WORKER_TOKEN="<production-worker-token>"
-    export ANDROID_SERIAL="emulator-5554"
-    export BHARATSIM_ENABLE_LOCAL_APK_EXECUTION="true"
-    python -m worker.agent
-    ```
+### 1.1 Dedicated Android Worker VM (Hardware Virtualization)
+- **Requirement:** A Linux virtual machine or bare-metal host with KVM enabled (`/dev/kvm`).
+- **Why It Cannot Run in Vercel Serverless:** Vercel functions are stateless serverless containers with a 60-second execution cap and no nested KVM hardware virtualization. Running an Android emulator requires a persistent Linux host.
+- **Turnkey Solution Provided:**
+  - One-command setup: `sudo bash deploy/worker/setup-worker-host.sh`
+  - Automated Docker with KVM passthrough: `docker compose up -d` in `deploy/worker/`
+  - Recommended Cloud Provider: Google Cloud `n2-standard-4` ($0.19/hr) with `--enable-nested-virtualization`.
 
-### 1.2 Sarvam AI Live API Keys
-- **Status:** RESILIENT FALLBACK ACTIVE
-- **Details:** If `SARVAM_API_KEY` is not set in production Vercel environment variables, the system automatically uses verified local fallbacks (high-quality localized text terms and deterministic audio WAV headers). To enable live cloud inference, add `SARVAM_API_KEY` in the Vercel project dashboard.
+### 1.2 Sarvam AI Cloud API Credentials
+- **Requirement:** `SARVAM_API_KEY` environment variable in Vercel.
+- **Current Behavior Without Key:** The system automatically uses verified local fallbacks (high-quality localized text terms in Hindi, Tamil, and Marathi, and deterministic WAV audio headers). Zero user-facing crashes occur. To enable live neural cloud translation, set `SARVAM_API_KEY` in the Vercel project settings.
 
-### 1.3 Supabase Production Database Migrations
-- **Status:** DUAL-MODE ACTIVE
-- **Details:** In local development and unit tests, SQLite runs in-memory or on disk with zero setup. For live production, Supabase PostgreSQL credentials (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `POSTGRES_URL`) should be configured in Vercel environment variables.
+### 1.3 Production Supabase Database URL
+- **Requirement:** `POSTGRES_URL` in Vercel environment variables.
+- **Current Behavior:** In local development and unit tests, SQLite runs automatically with zero setup. In production, Supabase provides managed PostgreSQL and storage buckets.

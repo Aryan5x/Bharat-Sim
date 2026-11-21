@@ -284,6 +284,19 @@ class AgentPersonaPassingAndTimeoutTests(unittest.TestCase):
         self.assertEqual(submitted_payload["status"], "failed")
         self.assertIn("timed out", submitted_payload["error"])
 
+    def test_log_worker_formats_iso_timestamp(self):
+        import io
+        from unittest.mock import patch
+        from worker.agent import log_worker
+
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            log_worker("INFO", "Test message payload")
+        output = buf.getvalue()
+        self.assertIn("[INFO]", output)
+        self.assertIn("Test message payload", output)
+        self.assertTrue(output.startswith("["))
+
 
 if __name__ == "__main__":
     unittest.main()

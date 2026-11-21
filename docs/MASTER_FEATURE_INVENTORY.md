@@ -89,3 +89,4 @@
 | REPORT-002 | Historical Executions List | `/` (Dashboard) | `GET /api/v1/runs` | DB `runs` | IMPLEMENTED AND VERIFIED | `test_api.py::test_get_runs` | Filterable by persona, status, date |
 | REPORT-003 | Report JSON Export | `/runs/:id` | `GET /api/v1/runs/{id}/report` | DB `runs.result_json` | IMPLEMENTED AND VERIFIED | `test_api.py::test_get_report` | Clean machine-readable JSON structure |
 | REPORT-004 | PDF Report Export | `/runs/:id` | Client-side print / PDF renderer | Browser print stylesheet | PARTIALLY IMPLEMENTED | Manual print verification | Client-side print styles format clean PDF; server-side headless chrome PDF is future work |
+

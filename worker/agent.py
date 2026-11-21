@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -19,6 +20,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +37,13 @@ from worker.condition_applicator import reset_target_safely
 
 RUNNER = ROOT / "worker" / "runner.py"
 MAX_RESPONSE_BYTES = 300_000
+
+
+def log_worker(level: str, message: str) -> None:
+    """Output ISO-8601 timestamped log message for daemon and journald observability."""
+    ts = datetime.now(timezone.utc).isoformat()
+    stream = sys.stderr if level in ("WARN", "ERROR", "CRITICAL") else sys.stdout
+    print(f"[{ts}] [{level}] {message}", file=stream, flush=True)
 
 
 class WorkerError(RuntimeError):
@@ -231,11 +240,16 @@ def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duratio
     stop_heartbeat = threading.Event()
 
     def heartbeat() -> None:
+        consecutive_failures = 0
         while not stop_heartbeat.wait(45):
             try:
                 request_json(base_url, token, str(job["heartbeat_url"]), {"lease_token": lease_token}, timeout=15)
+                consecutive_failures = 0
             except Exception as exc:
-                print(f"heartbeat warning for {run_id}: {exc}", file=sys.stderr, flush=True)
+                consecutive_failures += 1
+                log_worker("WARN", f"heartbeat warning for {run_id} ({consecutive_failures} consecutive failure(s)): {exc}")
+                if consecutive_failures >= 3:
+                    log_worker("CRITICAL", f"3 consecutive heartbeat failures for run {run_id}; lease may expire upstream")
 
     heartbeat_thread = threading.Thread(target=heartbeat, name="lease-heartbeat", daemon=True)
     heartbeat_thread.start()
@@ -271,9 +285,10 @@ def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duratio
             try:
                 completed = subprocess.run(
                     runner_command, env=env, capture_output=True, text=True, timeout=360, check=False,
+                    stdin=subprocess.DEVNULL,
                 )
             except subprocess.TimeoutExpired as timeout_exc:
-                print(f"runner timed out after 360s for run {run_id}; invoking safe cleanup fallback", file=sys.stderr, flush=True)
+                log_worker("ERROR", f"runner timed out after 360s for run {run_id}; invoking safe cleanup fallback")
                 reset_target_safely(serial)
                 raise WorkerError("Android smoke runner timed out after 360 seconds") from timeout_exc
 
@@ -354,24 +369,46 @@ def main() -> int:
         print(f"Runner not found: {RUNNER}", file=sys.stderr)
         return 2
 
-    print(f"BharatSim worker {worker_id} starting; target device is explicitly configured.", flush=True)
-    while True:
+    log_worker("INFO", f"BharatSim worker {worker_id} starting; target device is explicitly configured ({serial}).")
+    shutdown_requested = threading.Event()
+
+    def handle_shutdown(signum: int, frame: Any) -> None:
+        signame = "SIGTERM" if signum == getattr(signal, "SIGTERM", -1) else "SIGINT"
+        log_worker("WARN", f"Received {signame}; initiating graceful shutdown...")
+        shutdown_requested.set()
+
+    signal.signal(signal.SIGINT, handle_shutdown)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, handle_shutdown)
+
+    while not shutdown_requested.is_set():
         try:
             response = request_json(base_url, token, "/internal/worker/claim", {"worker_id": worker_id}, timeout=20)
             job = response.get("job")
             if not job:
-                time.sleep(poll_seconds)
+                if shutdown_requested.wait(poll_seconds):
+                    break
                 continue
-            print(f"claimed run {job.get('id')} attempt {job.get('attempt')}", flush=True)
+            log_worker("INFO", f"Claimed run {job.get('id')} attempt {job.get('attempt')}")
             run_job(base_url, token, serial, job, duration)
         except KeyboardInterrupt:
-            return 0
+            break
         except urllib.error.HTTPError as exc:
-            print(f"worker API HTTP error {exc.code}: {exc.reason}", file=sys.stderr, flush=True)
-            time.sleep(min(30, poll_seconds * 2))
+            log_worker("ERROR", f"Worker API HTTP error {exc.code}: {exc.reason}")
+            if shutdown_requested.wait(min(30, poll_seconds * 2)):
+                break
         except Exception as exc:
-            print(f"worker loop error: {exc}", file=sys.stderr, flush=True)
-            time.sleep(min(30, poll_seconds * 2))
+            log_worker("ERROR", f"Worker loop error: {exc}")
+            if shutdown_requested.wait(min(30, poll_seconds * 2)):
+                break
+
+    log_worker("INFO", "Performing safe device reset prior to worker shutdown...")
+    try:
+        reset_target_safely(serial)
+    except Exception as reset_exc:
+        log_worker("WARN", f"Device reset warning on shutdown: {reset_exc}")
+    log_worker("INFO", "BharatSim worker stopped cleanly.")
+    return 0
 
 
 if __name__ == "__main__":

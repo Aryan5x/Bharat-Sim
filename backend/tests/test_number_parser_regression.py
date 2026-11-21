@@ -23,3 +23,4 @@ def test_number_parsing():
     assert number("-15.2 MB") == -15.2
     assert number("N/A") is None
     assert number(None) is None
+

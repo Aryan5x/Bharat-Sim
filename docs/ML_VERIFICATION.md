@@ -51,3 +51,4 @@ The anomaly detector compares baseline execution telemetry against constrained e
 - **Zero-Anomalies Normalization:** Fixed defect where empty or non-divergent runs reported 100.0 anomaly score; now correctly reports `is_anomalous: false`, `anomaly_score: 0.0`.
 - **String Number Extraction:** Fixed regex in `main.py` line 2090 ensuring strings such as `" 142.5ms "` parse to `142.5` without dropping decimals.
 - **Uninitialized Variable Protection:** Initialized `start_delta` and `mem_delta` explicitly to prevent `NameError` on partial telemetry payloads.
+
