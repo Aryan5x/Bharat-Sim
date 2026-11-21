@@ -1,6 +1,6 @@
 # BharatSim — feature interaction inventory
 
-**Baseline:** main `4a1381db9d21e05a5f351bdac5d5710377839c1c`  
+**Baseline:** main `5ab14c89b6159c07ba538c1c5c5ddbc44ba8a49c`  
 **Audit date:** 2026-11-21
 
 This inventory records the interactive surface discovered in the current React application. It is not a claim that production credentials or infrastructure are configured.
