@@ -11,7 +11,9 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  Flame
+  Flame,
+  Mic,
+  ShieldCheck
 } from "lucide-react";
 import { useTheme } from "../theme";
 import { type Worker } from "../api";
@@ -87,6 +89,26 @@ export default function Sidebar({
         >
           <Layers3 size={17} />
           {!collapsed && <span>Overview</span>}
+        </button>
+
+        <button
+          type="button"
+          className={"nav-item " + (currentTab === "speak" ? "active" : "")}
+          onClick={() => onSelectTab("speak")}
+          title="Speak-to-Test with Sarvam AI"
+        >
+          <Mic size={17} />
+          {!collapsed && <span>Speak to Test</span>}
+        </button>
+
+        <button
+          type="button"
+          className={"nav-item " + (currentTab === "fixproof" ? "active" : "")}
+          onClick={() => onSelectTab("fixproof")}
+          title="FixProof: verify a fix"
+        >
+          <ShieldCheck size={17} />
+          {!collapsed && <span>FixProof</span>}
         </button>
 
         <button

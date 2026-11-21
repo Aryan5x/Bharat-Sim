@@ -36,7 +36,7 @@ def make_db(rows):
     connection.row_factory = sqlite3.Row
     connection.execute(
         "CREATE TABLE runs (id TEXT PRIMARY KEY, created_at TEXT, status TEXT, apk_name TEXT, apk_sha256 TEXT, "
-        "persona_id TEXT, error TEXT, result_json TEXT, owner_id TEXT)"
+        "persona_id TEXT, error TEXT, result_json TEXT, owner_id TEXT, scenario_json TEXT)"
     )
     connection.executemany(
         "INSERT INTO runs(id,created_at,status,apk_name,apk_sha256,persona_id,error,result_json,owner_id) VALUES(?,?,?,?,?,?,?,?,?)",

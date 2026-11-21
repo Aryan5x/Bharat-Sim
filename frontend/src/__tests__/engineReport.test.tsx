@@ -92,7 +92,7 @@ describe("engine report", () => {
     expect(text).toContain("2% loss");
     expect(text).toContain("no app traffic passed the shaping proxy");
     expect(text).toContain("No crash, ANR, out-of-memory");
-    expect(text).toContain("Sarvam AI translation");
+    expect(text).toContain("Explain this result");
   });
 
   it("renders an outage result and findings with evidence and a fix", async () => {

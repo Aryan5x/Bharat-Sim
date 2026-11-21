@@ -404,7 +404,7 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
           </p>
         </div>
       ) : isEngineReport(report) ? (
-        <EngineReportView report={report as unknown as Record<string, unknown>} runId={run.id} />
+        <EngineReportView report={report as unknown as Record<string, unknown>} runId={run.id} spec={(run as unknown as { scenario?: { spec?: Record<string, unknown> } }).scenario?.spec ?? null} />
       ) : (
         <div className="run-evidence-body">
           {report.diagnostics ? <EvidenceSynthesisPanel diagnostics={report.diagnostics} /> : null}

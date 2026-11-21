@@ -29,6 +29,7 @@ from typing import Any, Callable
 from . import ml
 from .device import ApkInfo, Device, DeviceError, apk_info
 from .shaper import Shape, Shaper, shape_for
+from .scenarios import run_scenario
 
 ENGINE_VERSION = "bharatsim-engine-2.0"
 SCORING_PATH = Path(__file__).resolve().parent / "scoring.json"
@@ -490,6 +491,16 @@ def execute(apk: Path, job: dict[str, Any], dev: Device, shaper: Shaper, stage: 
             if not activity:
                 raise DeviceError("The APK has no launchable activity")
         results[p["key"]] = run_profile(dev, shaper, apk, info, activity, p, cfg, stage)
+    scenario = None
+    scenario_id = job.get("scenario_id")
+    if scenario_id and results[profiles[1]["key"]].get("installed"):
+        # Scripted journey with machine-checked assertions (allowlisted ids only).
+        dev.reset_conditions()
+        dev.set_proxy(None)
+        dev.uninstall(info.package)
+        dev.install(str(apk))
+        scenario = run_scenario(str(scenario_id), dev, info.package, activity, stage)
+        dev.uninstall(info.package)
     stage("Analysing results")
     base, cons = results["baseline"], results[profiles[1]["key"]]
     for r in (base, cons):
@@ -513,4 +524,5 @@ def execute(apk: Path, job: dict[str, Any], dev: Device, shaper: Shaper, stage: 
         "anomalies": anomaly,
         "readiness": readiness,
         "ml": {"model_version": ml.MODEL_VERSION, **ml.metadata()},
+        **({"scenario": scenario} if scenario else {}),
     }

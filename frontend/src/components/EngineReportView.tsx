@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
 import { CheckCircle2, CircleAlert, Cpu, FileDown, FileSearch, Gauge, ShieldAlert, Wrench } from "lucide-react";
 import ScoreRing from "./ScoreRing";
-import SarvamTranslation from "./SarvamTranslation";
-import { api, type Capabilities } from "../api";
+import ExplainPanel from "./ExplainPanel";
+import ScenarioResult from "./ScenarioResult";
 import { downloadEngineRunPdf } from "../pdfExport";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -67,17 +66,7 @@ export function engineSummaryText(report: Obj): string {
   return parts.join(" ");
 }
 
-export default function EngineReportView({ report, runId }: { report: Obj; runId: string }) {
-  const [sarvamEnabled, setSarvamEnabled] = useState(false);
-  useEffect(() => {
-    let live = true;
-    api<Capabilities>("/api/v1/capabilities")
-      .then((caps) => live && setSarvamEnabled(Boolean((caps as Obj).sarvam_translation)))
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, []);
+export default function EngineReportView({ report, runId, spec }: { report: Obj; runId: string; spec?: Obj | null }) {
 
   const readiness: Obj = report.readiness || {};
   const base: Obj = report.baseline || {};
@@ -147,6 +136,8 @@ export default function EngineReportView({ report, runId }: { report: Obj; runId
           ))}
         </div>
       </div>
+
+      {report.scenario && <ScenarioResult scenario={report.scenario} spec={spec} />}
 
       {/* 01 Findings */}
       <div className="evidence-section">
@@ -364,7 +355,7 @@ export default function EngineReportView({ report, runId }: { report: Obj; runId
         </div>
       </div>
 
-      <SarvamTranslation enabled={sarvamEnabled} text={engineSummaryText(report)} />
+      <ExplainPanel runId={runId} />
     </div>
   );
 }

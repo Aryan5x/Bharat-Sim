@@ -25,6 +25,8 @@ export default function Topbar({
 }: TopbarProps) {
   const tabTitles: Record<string, string> = {
     overview: "Overview & Dashboard",
+    speak: "Speak to Test",
+    fixproof: "FixProof",
     "new-test": "Configure New Test",
     runs: "Test Runs",
     analysis: "Logcat & ML Analysis",

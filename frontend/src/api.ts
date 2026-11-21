@@ -108,6 +108,8 @@ export type Run = {
   error?: string;
   readiness_score?: number | null;
   readiness_status?: string | null;
+  scenario_id?: string | null;
+  scenario_verdict?: string | null;
 };
 
 export type Worker = {
@@ -406,7 +408,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const r = await fetch(API + path, { ...init, headers });
     if (!r.ok) {
       const b = await r.json().catch(() => ({}));
-      throw new Error(b.detail || `Request failed (${r.status})`);
+      const detail = Array.isArray(b.detail)
+        ? b.detail.map((d: { msg?: string }) => d.msg || "invalid input").join("; ")
+        : b.detail;
+      throw new Error(detail || `Request failed (${r.status})`);
     }
     return (await r.json()) as T;
   } catch (err) {
