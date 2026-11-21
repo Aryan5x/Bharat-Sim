@@ -30,7 +30,7 @@ export default function NewTestWizard({
   onSelectPersona,
   busy,
   uploadAvailable,
-  maxUploadMb = 150,
+  maxUploadMb = 500,
   lockedReason,
   onSubmit,
   onCancel,

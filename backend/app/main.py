@@ -168,7 +168,25 @@ def validate_runtime_security_config(environment: dict[str, str] | None = None) 
         raise RuntimeError("Production startup blocked: configure BHARATSIM_STORAGE_BUCKET")
 
 
-MAX_UPLOAD_BYTES = max(1, min(int(os.getenv("BHARATSIM_MAX_UPLOAD_MB", "150")), 150)) * 1024 * 1024
+MAX_UPLOAD_LIMIT_MB = 500
+MAX_UPLOAD_BYTES = max(1, min(int(os.getenv("BHARATSIM_MAX_UPLOAD_MB", str(MAX_UPLOAD_LIMIT_MB))), MAX_UPLOAD_LIMIT_MB)) * 1024 * 1024
+# Supabase Free caps each stored object at 50 MB, so larger APKs are stored as parts.
+APK_PART_BYTES = 45 * 1024 * 1024
+_PARTS_RE = re.compile(r"^(?P<base>runs/[0-9a-f-]{36}/input\.apk)~parts=(?P<n>[1-9][0-9]{0,2})$")
+
+
+def apk_parts_path(base: str, size_bytes: int) -> str:
+    """Storage path for an APK: a single object, or a manifest-style path naming N parts."""
+    parts = max(1, -(-size_bytes // APK_PART_BYTES))
+    return base if parts == 1 else f"{base}~parts={parts}"
+
+
+def apk_part_objects(object_path: str) -> list[str]:
+    """Expand a storage path into the object(s) that hold the APK bytes, in order."""
+    match = _PARTS_RE.match(object_path or "")
+    if not match:
+        return [object_path]
+    return [f"{match.group('base')}.part{i:03d}" for i in range(int(match.group("n")))]
 MAX_APK_ENTRIES = 10000
 MAX_APK_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024
 MAX_APK_COMPRESSION_RATIO = 1000
@@ -197,19 +215,29 @@ def _storage_headers(content_type: str = "application/octet-stream") -> dict[str
 
 
 def upload_private_object(source: Path, object_path: str) -> None:
-    """Stream an APK into the private bucket without loading it into memory."""
+    """Stream an APK into the private bucket (split into parts when the path names parts)."""
+    objects = apk_part_objects(object_path)
+    total = source.stat().st_size
+    with source.open("rb") as stream:
+        for index, part in enumerate(objects):
+            length = APK_PART_BYTES if index < len(objects) - 1 else total - APK_PART_BYTES * (len(objects) - 1)
+            _upload_stream_part(stream, length, part)
+
+
+def _upload_stream_part(stream, length: int, object_path: str) -> None:
     connection, endpoint = _storage_connection_and_path(object_path)
     try:
         connection.putrequest("POST", endpoint)
         headers = _storage_headers("application/vnd.android.package-archive")
-        headers["Content-Length"] = str(source.stat().st_size)
+        headers["Content-Length"] = str(length)
         headers["x-upsert"] = "false"
         for name, value in headers.items():
             connection.putheader(name, value)
         connection.endheaders()
-        with source.open("rb") as stream:
-            while chunk := stream.read(1024 * 1024):
-                connection.send(chunk)
+        remaining = length
+        while remaining > 0 and (chunk := stream.read(min(1024 * 1024, remaining))):
+            connection.send(chunk)
+            remaining -= len(chunk)
         response = connection.getresponse()
         body = response.read(2048)
         if response.status not in (200, 201):
@@ -256,6 +284,17 @@ def build_tus_signed_upload_config(signed_url: str) -> dict[str, str]:
     }
 
 def private_object_size(object_path: str) -> int | None:
+    """Total stored size of an APK (all parts); None if any part is missing."""
+    total = 0
+    for part in apk_part_objects(object_path):
+        size = _single_object_size(part)
+        if size is None:
+            return None
+        total += size
+    return total
+
+
+def _single_object_size(object_path: str) -> int | None:
     """Read object size using a server-authenticated HEAD request."""
     connection, endpoint = _storage_connection_and_path(object_path)
     try:
@@ -272,7 +311,49 @@ def private_object_size(object_path: str) -> int | None:
         connection.close()
 
 
+class _ChainedParts:
+    """Reads several stored parts as one stream; acts as both connection and response."""
+
+    def __init__(self, objects: list[str], total: int | None):
+        self._objects = list(objects)
+        self._total = total
+        self._current = None
+
+    def getheader(self, name: str, default=None):
+        if name.lower() == "content-length" and self._total is not None:
+            return str(self._total)
+        return default
+
+    def read(self, size: int = -1) -> bytes:
+        while True:
+            if self._current is None:
+                if not self._objects:
+                    return b""
+                self._current = _open_single_object(self._objects.pop(0))
+            chunk = self._current[1].read(size)
+            if chunk:
+                return chunk
+            self._current[1].close()
+            self._current[0].close()
+            self._current = None
+
+    def close(self) -> None:
+        if self._current is not None:
+            self._current[1].close()
+            self._current[0].close()
+            self._current = None
+
+
 def open_private_object(object_path: str):
+    """Open a private APK (single object or parts) for a worker-only streamed download."""
+    objects = apk_part_objects(object_path)
+    if len(objects) == 1:
+        return _open_single_object(objects[0])
+    chained = _ChainedParts(objects, private_object_size(object_path))
+    return chained, chained
+
+
+def _open_single_object(object_path: str):
     """Open a private object response for a worker-only streamed download."""
     connection, endpoint = _storage_connection_and_path(object_path)
     try:
@@ -294,7 +375,7 @@ def delete_private_object(object_path: str) -> None:
     parsed = urlsplit(SUPABASE_URL)
     connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=60)
     endpoint = f"/storage/v1/object/{quote(STORAGE_BUCKET, safe='')}"
-    payload = json.dumps({"prefixes": [object_path]}).encode("utf-8")
+    payload = json.dumps({"prefixes": apk_part_objects(object_path)}).encode("utf-8")
     headers = _storage_headers("application/json")
     headers["Content-Length"] = str(len(payload))
     try:
@@ -657,7 +738,7 @@ class SignedUploadRequest(BaseModel):
     persona_id: str = "budget-android"
     custom_persona: dict[str, Any] | None = None
     filename: str = Field(min_length=5, max_length=255)
-    size_bytes: int = Field(gt=0, le=157286400)
+    size_bytes: int = Field(gt=0, le=524288000)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     scenario: dict[str, Any] | None = None
 
@@ -1420,9 +1501,10 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
     with db() as conn:
         enforce_run_quota(conn, owner_id, datetime.now(timezone.utc))
     run_id = str(uuid.uuid4())
-    object_path = f"runs/{run_id}/input.apk"
+    object_path = apk_parts_path(f"runs/{run_id}/input.apk", payload.size_bytes)
     try:
-        signed_url = create_private_upload_url(object_path)
+        signed_urls = [create_private_upload_url(part) for part in apk_part_objects(object_path)]
+        signed_url = signed_urls[0]
         upload_capability = build_tus_signed_upload_config(signed_url)
     except Exception:
         raise HTTPException(status_code=503, detail="Private APK upload could not be prepared. No run was queued.")
@@ -1452,6 +1534,9 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
         # Single signed PUT (preferred): Supabase's resumable endpoint rejects signed
         # uploads with an RLS error on this project, while the signed PUT succeeds.
         "signed_upload_url": signed_url,
+        # Large APKs: upload consecutive APK_PART_BYTES slices, one per URL, in order.
+        "signed_upload_urls": signed_urls,
+        "part_size_bytes": APK_PART_BYTES,
         "object_path": object_path,
         "expires_in_seconds": 7200,
         "message": "A resumable private upload is ready. Upload the APK in retryable chunks, then confirm the upload.",
@@ -1588,7 +1673,7 @@ async def create_run(
                 raise HTTPException(status_code=415, detail="File does not look like a ZIP-based APK (missing PK header)")
             validate_apk_archive(target)
             if STORAGE_ENABLED:
-                apk_storage_path = f"runs/{run_id}/input.apk"
+                apk_storage_path = apk_parts_path(f"runs/{run_id}/input.apk", total)
                 try:
                     await asyncio.to_thread(upload_private_object, target, apk_storage_path)
                 except Exception as exc:

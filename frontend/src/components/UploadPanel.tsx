@@ -20,7 +20,7 @@ interface UploadPanelProps {
   onSubmit: (e: FormEvent) => Promise<void>;
 }
 
-const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB (private storage object limit)
+const MAX_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB (large APKs are stored in parts)
 
 export default function UploadPanel({
   apk,
@@ -62,7 +62,7 @@ export default function UploadPanel({
     if (file.size > MAX_SIZE_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
       setApk(null);
-      setFileError(`File exceeds the 50 MB limit (${sizeMb} MB). Please choose a smaller APK.`);
+      setFileError(`File exceeds the 500 MB limit (${sizeMb} MB). Please choose a smaller APK.`);
       return;
     }
 
@@ -131,7 +131,7 @@ export default function UploadPanel({
               ? `${(apk.size / 1024 / 1024).toFixed(1)} MB · Ready to upload`
               : "Choose an APK to enable run registration"}
           </small>
-          <span className="file-limit">{!uploadAvailable ? "APK registration unavailable" : directUploadAvailable ? "APK · Max 50 MB" : "APK · Max 4 MB"}</span>
+          <span className="file-limit">{!uploadAvailable ? "APK registration unavailable" : directUploadAvailable ? "APK · Max 500 MB" : "APK · Max 4 MB"}</span>
         </label>
 
         {apiStatus === "offline" && (

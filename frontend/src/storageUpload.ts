@@ -3,6 +3,9 @@ export type SignedApkUploadTicket = {
   upload_token: string;
   tus_endpoint: string;
   signed_upload_url?: string;
+  /** Large APKs: one signed URL per consecutive slice of part_size_bytes. */
+  signed_upload_urls?: string[];
+  part_size_bytes?: number;
   object_path: string;
   expires_in_seconds: number;
 };
@@ -55,10 +58,11 @@ function readPending(sha256: string): PendingUpload | null {
       !value.run_id ||
       !value.upload_token ||
       !value.tus_endpoint ||
-      value.object_path !== "runs/" + value.run_id + "/input.apk" ||
+      !(value.object_path === "runs/" + value.run_id + "/input.apk" ||
+        value.object_path.startsWith("runs/" + value.run_id + "/input.apk~parts=")) ||
       !Number.isFinite(value.file_size) ||
       value.file_size <= 0 ||
-      value.file_size > 150 * 1024 * 1024 ||
+      value.file_size > 500 * 1024 * 1024 ||
       !Number.isFinite(value.file_last_modified) ||
       !Number.isFinite(value.expires_at) ||
       value.expires_at <= Date.now() ||
@@ -278,11 +282,23 @@ export async function uploadApkResumable(
  * The signed URL is issued by our API for a server-generated object path and is
  * only accepted when it points at this project's Supabase Storage.
  */
-export function uploadApkSigned(file: File, ticket: SignedApkUploadTicket, onProgress: (percentage: number) => void): Promise<void> {
-  const url = ticket.signed_upload_url;
-  if (!url || !isTrustedStorageUrl(url, "/storage/v1/object/upload/sign/")) {
-    return Promise.reject(new Error("The server returned an untrusted upload URL."));
+export async function uploadApkSigned(file: File, ticket: SignedApkUploadTicket, onProgress: (percentage: number) => void): Promise<void> {
+  const urls = ticket.signed_upload_urls?.length ? ticket.signed_upload_urls : ticket.signed_upload_url ? [ticket.signed_upload_url] : [];
+  if (!urls.length || urls.some((u) => !isTrustedStorageUrl(u, "/storage/v1/object/upload/sign/"))) {
+    throw new Error("The server returned an untrusted upload URL.");
   }
+  if (urls.length === 1) return putSigned(urls[0], file, onProgress);
+  // Large APK: upload consecutive slices in order (each stays under the storage per-file limit).
+  const partSize = ticket.part_size_bytes || Math.ceil(file.size / urls.length);
+  for (let i = 0; i < urls.length; i++) {
+    const start = i * partSize;
+    const slice = file.slice(start, i === urls.length - 1 ? file.size : start + partSize);
+    await putSigned(urls[i], slice, (pct) => onProgress(Math.min(100, Math.round(((start + (slice.size * pct) / 100) / file.size) * 100))));
+  }
+  onProgress(100);
+}
+
+function putSigned(url: string, body: Blob, onProgress: (percentage: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
@@ -296,13 +312,13 @@ export function uploadApkSigned(file: File, ticket: SignedApkUploadTicket, onPro
         onProgress(100);
         resolve();
       } else if (xhr.status === 413) {
-        reject(new Error("The APK is larger than the 50 MB storage limit."));
+        reject(new Error("Storage rejected this part as too large. Please try again."));
       } else {
         reject(new Error("Private upload failed (" + xhr.status + "). Please try again."));
       }
     };
     xhr.onerror = () => reject(new Error("Network error while uploading the APK. Check your connection and retry."));
     xhr.ontimeout = () => reject(new Error("The upload timed out. Check your connection and retry."));
-    xhr.send(file);
+    xhr.send(body);
   });
 }
