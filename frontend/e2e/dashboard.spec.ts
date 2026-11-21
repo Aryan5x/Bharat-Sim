@@ -222,6 +222,18 @@ test("workspace sections never overlap at common desktop, tablet and phone width
     await page.goto("/");
     await expect(page.getByText("API connected")).toBeVisible();
 
+    if (width <= 720) {
+      const mobileShell = await page.evaluate(() => ({
+        sidebarPosition: getComputedStyle(document.querySelector(".sidebar")!).position,
+        sidebarWidth: document.querySelector(".sidebar")!.getBoundingClientRect().width,
+        mainMarginLeft: Number.parseFloat(getComputedStyle(document.querySelector(".main")!).marginLeft),
+        viewport: document.documentElement.clientWidth,
+      }));
+      expect(mobileShell.sidebarPosition).not.toBe("fixed");
+      expect(mobileShell.sidebarWidth).toBeCloseTo(mobileShell.viewport, 0);
+      expect(mobileShell.mainMarginLeft).toBe(0);
+    }
+
     const layout = await page.evaluate(() => {
       const selectors = [".topbar > *", ".sidebar nav > *", ".metric-grid > *", ".dashboard-grid > *"];
       const overlaps: string[] = [];
