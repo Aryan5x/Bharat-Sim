@@ -54,7 +54,7 @@ test("dashboard connects to the real API and renders authored profiles", async (
   await expect(page.getByText("Budget Android", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Profiles returned by API")).toBeVisible();
   await expect(page.getByText(/authored test targets, not measurements from physical devices/)).toBeVisible();
-  await expect(page.getByText("PACKET LOSS · NOT APPLIED")).toBeVisible();
+  await expect(page.getByText("PACKET LOSS", { exact: true })).toBeVisible();
   await expect(page.getByText("2% target", { exact: true })).toBeVisible();
 });
 
@@ -107,7 +107,7 @@ test("log analysis reports findings from submitted evidence and preserves source
   const pdfDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export PDF" }).click();
   const pdfDownload = await pdfDownloadPromise;
-  expect(pdfDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\\.pdf$/);
+  expect(pdfDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\.pdf$/);
   const pdfPath = await pdfDownload.path();
   expect(pdfPath).not.toBeNull();
   const pdfBytes = await readFile(pdfPath!);
@@ -116,7 +116,7 @@ test("log analysis reports findings from submitted evidence and preserves source
   const jsonDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON" }).click();
   const jsonDownload = await jsonDownloadPromise;
-  expect(jsonDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\\.json$/);
+  expect(jsonDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\.json$/);
   const jsonPath = await jsonDownload.path();
   expect(jsonPath).not.toBeNull();
   const jsonPayload = JSON.parse(await readFile(jsonPath!, "utf8"));
@@ -128,7 +128,7 @@ test("run registration is disabled until a real APK is selected", async ({ page 
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
-  const register = page.getByRole("button", { name: /Register test run/ });
+  const register = page.getByRole("button", { name: /Start test/ });
   await expect(register).toBeDisabled();
   await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
   await expect(page.getByRole("button", { name: /Test Runs/i })).toContainText("0");
@@ -176,9 +176,9 @@ test("dashboard remains usable at narrow mobile widths without horizontal overfl
 test("API documentation link stays same-origin in production builds", async ({ page }) => {
   await installLocalWorkspaceSession(page);
   await page.goto("/");
-  const docsLink = page.getByRole("link", { name: /API documentation/ });
+  const docsLink = page.getByRole("link", { name: /Project documentation on GitHub/ });
   const href = await docsLink.getAttribute("href");
-  expect(href).toMatch(/\/docs$/);
+  expect(href).toContain("github.com/kaustubhdua/Bharat-Sim#readme");
   expect(href).not.toContain("localhost:8000");
 });
 
@@ -299,6 +299,6 @@ test("public product landing is reachable without signing in", async ({ page }) 
   await page.goto("/landing");
   await page.evaluate(() => sessionStorage.clear());
   await page.reload();
-  await expect(page.getByRole("heading", { name: /Test Android apps for the phones/ })).toBeVisible();
-  await expect(page.getByText(/INTERACTIVE PRODUCT PREVIEW/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Test Android Apps Under/ })).toBeVisible();
+  await expect(page.getByText(/BHARATSIM 2.0 · THE CHEAP PHONE TEST/)).toBeVisible();
 });
