@@ -41,8 +41,7 @@ import ScoreRing from "./components/ScoreRing";
 import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
-import SpeakToTestView, { type SubmitRunOptions } from "./components/SpeakToTestView";
-import FixProofView from "./components/FixProofView";
+import type { SubmitRunOptions } from "./components/SpeakToTestView";
 import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
@@ -59,6 +58,8 @@ const NewTestWizard = lazy(() => import("./components/NewTestWizard"));
 const CompareRunsView = lazy(() => import("./components/CompareRunsView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 const RunDetailView = lazy(() => import("./components/RunDetailView"));
+const SpeakToTestView = lazy(() => import("./components/SpeakToTestView"));
+const FixProofView = lazy(() => import("./components/FixProofView"));
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 // API_DOCS_URL kept for future use

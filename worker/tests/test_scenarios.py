@@ -6,15 +6,19 @@ import urllib.request
 from worker.scenarios import SCENARIOS, MockGateway, run_scenario
 
 
+direct_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def post(port, body):
     req = urllib.request.Request(f"http://127.0.0.1:{port}/pay", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=5) as r:
+    with direct_opener.open(req, timeout=5) as r:
         return json.loads(r.read())
 
 
 def status(port, order):
-    with urllib.request.urlopen(f"http://127.0.0.1:{port}/status?order_id={order}", timeout=5) as r:
+    req = urllib.request.Request(f"http://127.0.0.1:{port}/status?order_id={order}")
+    with direct_opener.open(req, timeout=5) as r:
         return json.loads(r.read())
 
 
@@ -35,7 +39,7 @@ class MockGatewayTests(unittest.TestCase):
             req = urllib.request.Request(f"http://127.0.0.1:{gw.port}/pay",
                                          data=json.dumps({"order_id": "ORD-2", "idempotency_key": "a"}).encode(), method="POST")
             with self.assertRaises(Exception):
-                urllib.request.urlopen(req, timeout=0.5)  # the app's timeout fires first
+                direct_opener.open(req, timeout=0.5)  # the app's timeout fires first
             self.assertTrue(status(gw.port, "ORD-2")["charged"])  # but the bank already took the money
 
     def test_gateway_binds_loopback_only(self):
