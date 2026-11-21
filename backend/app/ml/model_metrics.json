@@ -1,0 +1,14 @@
+{
+  "model_version": "1.0.0",
+  "algorithm": "TF-IDF + Linear Classifier",
+  "accuracy": 1.0,
+  "sample_count": 58,
+  "classes": [
+    "anr",
+    "crash",
+    "network",
+    "normal",
+    "oom",
+    "storage"
+  ]
+}

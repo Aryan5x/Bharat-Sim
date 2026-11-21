@@ -7,6 +7,7 @@ import {
   CircleAlert,
   Clock3,
   FileSearch,
+  GitCompare,
   Layers3,
   LoaderCircle,
   RefreshCw,
@@ -16,6 +17,7 @@ import {
   Wifi
 } from "lucide-react";
 import EvidenceSynthesisPanel from "./EvidenceSynthesisPanel";
+import RunComparisonModal from "./RunComparisonModal";
 import {
   api,
   downloadApi,
@@ -23,6 +25,7 @@ import {
   date,
   isRunActive,
   isRunExecuting,
+  type Run,
   type RunDetail,
   type Persona,
   type WorkerReport,
@@ -64,6 +67,18 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [events, setEvents] = useState<RunEvent[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonRuns, setComparisonRuns] = useState<Run[]>([]);
+
+  const handleOpenComparison = async () => {
+    try {
+      const res = await api<{ items: Run[] }>("/api/v1/runs");
+      setComparisonRuns(res.items);
+    } catch {
+      if (run) setComparisonRuns([run]);
+    }
+    setShowComparison(true);
+  };
 
   const fetchRun = useCallback(
     async (showLoadingSpinner = true) => {
@@ -249,6 +264,13 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
           <ArrowLeft size={15} /> Back to all test runs
         </button>
         <div className="detail-actions">
+          <button
+            className="secondary-button"
+            onClick={() => void handleOpenComparison()}
+            title="Compare telemetry with baseline run"
+          >
+            <GitCompare size={14} /> Compare run
+          </button>
           <button
             className="secondary-button report-export-button"
             onClick={() => void handleDownloadReport()}
@@ -707,6 +729,14 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
             )}
           </div>
         </div>
+      )}
+
+      {showComparison && (
+        <RunComparisonModal
+          currentRunId={run.id}
+          runs={comparisonRuns}
+          onClose={() => setShowComparison(false)}
+        />
       )}
     </section>
   );

@@ -1,5 +1,6 @@
-import { CircleAlert, FileSearch, CheckCircle2, GitBranch, Gauge } from "lucide-react";
+import { CircleAlert, FileSearch, CheckCircle2, GitBranch, Gauge, Brain, Sparkles, Code2 } from "lucide-react";
 import { type Finding, cls } from "../api";
+import SarvamAudioPlayer from "./SarvamAudioPlayer";
 
 interface FindingCardProps {
   finding: Finding;
@@ -17,6 +18,11 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
           <h3>{f.title}</h3>
         </div>
         <div className="finding-badges">
+          {f.ml_classification && (
+            <span className="ml-badge" title={`Confidence: ${(f.ml_classification.confidence * 100).toFixed(1)}%`}>
+              <Brain size={12} /> ML: {f.ml_classification.category.toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)}%)
+            </span>
+          )}
           {f.occurrence_count ? <span className="occurrence-badge">{f.occurrence_count} occurrence{f.occurrence_count === 1 ? "" : "s"}</span> : null}
           <span className={"risk-badge " + cls(f.severity)}>{f.severity}</span>
         </div>
@@ -49,6 +55,38 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
           <ol>{f.root_cause_hypothesis.validation_steps.map((step) => <li key={step}>{step}</li>)}</ol>
         </details>
       ) : null}
+
+      {f.sarvam_explanation && (
+        <div className="sarvam-explanation-card">
+          <div className="sarvam-exp-header">
+            <Sparkles size={14} />
+            <span>SARVAM AI DIAGNOSTIC & DEVELOPER REMEDY</span>
+          </div>
+          <div className="sarvam-exp-body">
+            <p><strong>Root Cause:</strong> {f.sarvam_explanation.root_cause}</p>
+            <p><strong>Impact:</strong> {f.sarvam_explanation.impact}</p>
+            <p><strong>Fix:</strong> {f.sarvam_explanation.remediation}</p>
+            {f.sarvam_explanation.hindi_explanation && (
+              <div className="hindi-briefing-box" lang="hi">
+                <small>हिंदी सारांश:</small>
+                <p>{f.sarvam_explanation.hindi_explanation}</p>
+              </div>
+            )}
+            {f.sarvam_explanation.defensive_code && (
+              <details className="defensive-code-details">
+                <summary><Code2 size={13} /> View defensive code fix</summary>
+                <pre><code>{f.sarvam_explanation.defensive_code}</code></pre>
+              </details>
+            )}
+            <SarvamAudioPlayer
+              text={f.sarvam_explanation.hindi_explanation || f.sarvam_explanation.remediation}
+              defaultLang="hi-IN"
+              label="Listen to voice briefing (Bulbul TTS)"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="recommendation">
         <CheckCircle2 size={16} />
         <span>

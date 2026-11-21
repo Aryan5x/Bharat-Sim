@@ -89,6 +89,58 @@ def parse_emulator_network_status(output: str) -> dict[str, int] | None:
     return values
 
 
+def parse_gfxinfo_metrics(output: str) -> dict[str, Any]:
+    """Parse frame rendering and jank statistics from dumpsys gfxinfo output."""
+    metrics: dict[str, Any] = {
+        "total_frames": 0,
+        "janky_frames": 0,
+        "jank_percentage": 0.0,
+        "slow_ui_thread": 0,
+    }
+    tf_match = re.search(r"Total frames rendered:\s*(\d+)", output, re.I)
+    if tf_match:
+        metrics["total_frames"] = int(tf_match.group(1))
+
+    jf_match = re.search(r"Janky frames:\s*(\d+)\s*\(([\d\.]+)%\)", output, re.I)
+    if jf_match:
+        metrics["janky_frames"] = int(jf_match.group(1))
+        metrics["jank_percentage"] = float(jf_match.group(2))
+    elif metrics["total_frames"] > 0:
+        jf_alt = re.search(r"Janky frames:\s*(\d+)", output, re.I)
+        if jf_alt:
+            metrics["janky_frames"] = int(jf_alt.group(1))
+            metrics["jank_percentage"] = round((metrics["janky_frames"] / metrics["total_frames"]) * 100, 2)
+
+    ui_match = re.search(r"Number Slow UI thread:\s*(\d+)", output, re.I)
+    if ui_match:
+        metrics["slow_ui_thread"] = int(ui_match.group(1))
+
+    return metrics
+
+
+def parse_meminfo_metrics(output: str) -> dict[str, Any]:
+    """Extract PSS memory usage in megabytes from dumpsys meminfo output."""
+    metrics: dict[str, Any] = {
+        "total_pss_mb": 0,
+        "java_heap_mb": 0,
+        "native_heap_mb": 0,
+    }
+    # Matches TOTAL PSS or TOTAL:
+    pss_match = re.search(r"TOTAL\s*(?:PSS)?:\s*(\d+)", output, re.I)
+    if pss_match:
+        metrics["total_pss_mb"] = round(int(pss_match.group(1)) / 1024, 1)
+
+    java_match = re.search(r"Java Heap:\s*(\d+)", output, re.I)
+    if java_match:
+        metrics["java_heap_mb"] = round(int(java_match.group(1)) / 1024, 1)
+
+    native_match = re.search(r"Native Heap:\s*(\d+)", output, re.I)
+    if native_match:
+        metrics["native_heap_mb"] = round(int(native_match.group(1)) / 1024, 1)
+
+    return metrics
+
+
 def apply_emulator_network_profile(
     serial: str, latency_ms: int, down_kbps: int, up_kbps: int, packet_loss_pct: float
 ) -> dict[str, object]:
@@ -391,7 +443,33 @@ def main() -> int:
             if launch.returncode != 0 or "No activities found" in launch.stdout + launch.stderr:
                 raise RuntimeError("could not launch app using launcher intent")
 
-            time.sleep(args.duration)
+            # Automated in-app exploration with bounded adb monkey (strict package bounds, no system key escape)
+            t = time.monotonic()
+            explore = run_cmd([
+                "adb", "-s", serial, "shell", "monkey",
+                "-p", package_name,
+                "--pct-touch", "70",
+                "--pct-motion", "20",
+                "--pct-syskeys", "0",
+                "--pct-appswitch", "0",
+                "--throttle", "250",
+                "100",
+            ], timeout=35)
+            record("explore_app_monkey", explore, time.monotonic() - t)
+
+            # Performance Telemetry: Frame rendering and jank from gfxinfo
+            t = time.monotonic()
+            gfx = run_cmd(["adb", "-s", serial, "shell", "dumpsys", "gfxinfo", package_name], timeout=15)
+            record("collect_gfxinfo", gfx, time.monotonic() - t)
+            report["telemetry_gfx"] = parse_gfxinfo_metrics(gfx.stdout)
+
+            # Performance Telemetry: RAM footprint from meminfo
+            t = time.monotonic()
+            mem = run_cmd(["adb", "-s", serial, "shell", "dumpsys", "meminfo", package_name], timeout=15)
+            record("collect_meminfo", mem, time.monotonic() - t)
+            report["telemetry_mem"] = parse_meminfo_metrics(mem.stdout)
+
+            time.sleep(max(1, min(args.duration, 10)))
             t = time.monotonic()
             logs = run_adb_with_retry(serial, ["logcat", "-d", "-t", "5000", "-v", "threadtime"], timeout=30)
             record("collect_logcat", logs, time.monotonic() - t)

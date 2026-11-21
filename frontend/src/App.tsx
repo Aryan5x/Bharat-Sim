@@ -30,7 +30,8 @@ import {
   type Capabilities,
   type Persona,
   type Run,
-  type Worker
+  type Worker,
+  type EvaluatorScenario
 } from "./api";
 
 import PersonaPanel from "./components/PersonaPanel";
@@ -42,6 +43,7 @@ import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
+import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
 import { isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
@@ -224,7 +226,7 @@ export default function App() {
     }
   }
 
-  async function analyzeLogs(text = logText) {
+  async function analyzeLogs(text = logText, personaId = selected) {
     if (!text.trim()) {
       setError("Paste logcat output first.");
       return;
@@ -239,7 +241,7 @@ export default function App() {
       const a = await api<Analysis>("/api/v1/analyze/logs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, persona_id: selected })
+        body: JSON.stringify({ text, persona_id: personaId })
       });
       setAnalysis(a);
       setNotice(a.persistence?.saved === false
@@ -260,6 +262,12 @@ export default function App() {
       if (analysisSucceeded) navigate("/analysis");
     }
   }
+
+  const handleLoadScenario = (scenario: EvaluatorScenario) => {
+    setSelected(scenario.persona_id);
+    setLogText(scenario.logcat);
+    void analyzeLogs(scenario.logcat, scenario.persona_id);
+  };
 
   function exportReport() {
     if (!analysis) return;
@@ -468,6 +476,8 @@ export default function App() {
               </section>
             </div>
           </section>
+
+          <EvaluatorTourBanner onLoadScenario={handleLoadScenario} />
 
           {error && (
             <div className="alert error-alert" role="alert">

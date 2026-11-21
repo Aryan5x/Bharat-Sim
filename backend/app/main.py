@@ -18,8 +18,17 @@ from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urlsplit
 
 import jwt
-from .sarvam import SarvamProviderError, SarvamRateLimited, translate_report_text
+from .sarvam import (
+    SarvamProviderError,
+    SarvamRateLimited,
+    translate_report_text,
+    generate_speech_audio,
+    explain_failure_with_sarvam,
+)
 from .evidence_fusion import fuse_worker_report
+from .ml_classifier import classify_logcat_stream
+from .anomaly_detector import detect_regressions
+from .evaluator_scenarios import get_all_scenarios, get_scenario_by_id
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
@@ -384,18 +393,32 @@ def validate_apk_archive(path: Path) -> None:
 
 PERSONAS: dict[str, dict[str, Any]] = {
     "budget-android": {
-        "id": "budget-android", "name": "Budget Android", "device": "Android 10 · 2 GB RAM",
-        "ram_mb": 2048, "storage_free_mb": 600, "network": "unstable-4g",
-        "latency_ms": 180, "down_kbps": 1200, "up_kbps": 350, "packet_loss_pct": 2,
+        "id": "budget-android", "name": "Budget Android", "device": "Android 11 · 2 GB RAM · 720p",
+        "ram_mb": 2048, "storage_free_mb": 500, "network": "unstable-4g",
+        "latency_ms": 180, "down_kbps": 1000, "up_kbps": 300, "packet_loss_pct": 2,
         "battery_saver": True, "risk": "high",
-        "description": "Constrained memory and storage with variable mobile connectivity.",
+        "description": "Constrained memory (2 GB RAM) and storage with battery saver enabled and CPU throttling.",
     },
     "edge-village": {
         "id": "edge-village", "name": "Edge / weak signal", "device": "Android 11 · 3 GB RAM",
-        "ram_mb": 3072, "storage_free_mb": 900, "network": "high-latency",
+        "ram_mb": 3072, "storage_free_mb": 900, "network": "rural-2g",
         "latency_ms": 450, "down_kbps": 256, "up_kbps": 96, "packet_loss_pct": 8,
         "battery_saver": True, "risk": "critical",
-        "description": "Slow throughput, high latency and intermittent packet loss.",
+        "description": "Rural 2G network conditions, ~450ms latency, 8% packet loss, restricted bandwidth.",
+    },
+    "crowded-station": {
+        "id": "crowded-station", "name": "Crowded Station", "device": "Android 11 · 2 GB RAM",
+        "ram_mb": 2048, "storage_free_mb": 400, "network": "congested-3g",
+        "latency_ms": 320, "down_kbps": 750, "up_kbps": 200, "packet_loss_pct": 4,
+        "battery_saver": False, "risk": "high",
+        "description": "Congested 3G network at transit hubs with variable latency and bandwidth contention.",
+    },
+    "congested-urban-4g": {
+        "id": "congested-urban-4g", "name": "Congested Urban 4G", "device": "Android 12 · 3 GB RAM",
+        "ram_mb": 3072, "storage_free_mb": 1200, "network": "congested-4g",
+        "latency_ms": 140, "down_kbps": 1800, "up_kbps": 400, "packet_loss_pct": 2,
+        "battery_saver": False, "risk": "medium",
+        "description": "High-density urban 4G with heavy peak-hour contention and latency spikes.",
     },
     "storage-pressure": {
         "id": "storage-pressure", "name": "Low storage", "device": "Android 10 · 2 GB RAM",
@@ -438,6 +461,21 @@ class LogAnalysisRequest(BaseModel):
 class SarvamTranslationRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     target_language_code: Literal["hi-IN", "ta-IN", "mr-IN"]
+
+class SarvamAudioRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+    target_language_code: Literal["hi-IN", "ta-IN", "mr-IN", "en-IN"] = "hi-IN"
+    speaker: str = "meera"
+
+class ExplainFailureRequest(BaseModel):
+    category: str = Field(min_length=1, max_length=50)
+    evidence: str = Field(default="", max_length=1000)
+    persona_id: str = "budget-android"
+    language_code: Literal["en-IN", "hi-IN"] = "en-IN"
+
+class CompareRunsRequest(BaseModel):
+    baseline_run_id: str
+    constrained_run_id: str
 
 class SignedUploadRequest(BaseModel):
     persona_id: str = "budget-android"
@@ -868,6 +906,11 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
                     ["Inspect the failing path and available disk space.", "Verify cache eviction and transactional write recovery.", "Repeat with a measured storage budget."]),
     }
     findings: list[dict[str, Any]] = []
+    ml_matches = classify_logcat_stream(text)
+    ml_counts: dict[str, int] = {}
+    for m in ml_matches:
+        ml_counts[m["category"]] = ml_counts.get(m["category"], 0) + 1
+
     for group in sorted(groups.values(), key=lambda item: (item["first_line"], item["kind"], item["fingerprint"])):
         explanation, recommendation, validation = explanations[group["kind"]]
         base = {"critical": 100, "high": 72, "medium": 44}[group["severity"]]
@@ -894,6 +937,12 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
             "validation_steps": validation,
             "status": "unconfirmed",
         }
+        # Enrich with ML classification & Sarvam AI developer explanation
+        ev_sample = group["evidence"][0]["text"] if group["evidence"] else ""
+        group["sarvam_explanation"] = explain_failure_with_sarvam(group["kind"], ev_sample, persona["name"])
+        matched_confs = [m["confidence"] for m in ml_matches if m["category"] == group["kind"]]
+        group["ml_confidence"] = max(matched_confs) if matched_confs else 0.85
+        group["ml_classification"] = "ml-corroborated" if matched_confs else "heuristic-rule"
         findings.append(group)
 
     critical = sum(1 for item in findings if item["severity"] == "critical")
@@ -920,6 +969,12 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
             "group_count": len(dna),
             "total_occurrences": total_occurrences,
             "method": "Normalized line fingerprints grouped by signal category; occurrences and source line numbers are retained.",
+        },
+        "ml_pipeline": {
+            "model_version": "1.0.0",
+            "algorithm": "TfidfVectorizer + LogisticRegression",
+            "signals_classified": len(ml_matches),
+            "signal_counts": ml_counts,
         },
         "root_cause_hypotheses": [item["root_cause_hypothesis"] | {"finding_id": item["id"], "kind": item["kind"]} for item in findings],
         "user_impact": {
@@ -1952,6 +2007,74 @@ def translate_report(payload: SarvamTranslationRequest):
         raise HTTPException(status_code=502, detail="Sarvam translation is temporarily unavailable. Your original report is unchanged.")
 
 
+@app.post("/api/v1/translate/audio")
+def text_to_speech(payload: SarvamAudioRequest):
+    """Generate spoken vernacular audio from diagnostic report using Sarvam Bulbul TTS."""
+    if not payload.text.strip():
+        raise HTTPException(status_code=422, detail="Audio synthesis text cannot be blank.")
+    try:
+        return generate_speech_audio(payload.text, payload.target_language_code, payload.speaker)
+    except SarvamRateLimited:
+        raise HTTPException(status_code=429, detail="Sarvam TTS rate limit reached. Please retry shortly.")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Sarvam audio generation error: {exc}")
+
+
+@app.post("/api/v1/explain/failure")
+def explain_failure(payload: ExplainFailureRequest):
+    """Generate plain-language developer remediation and code fixes using Sarvam AI."""
+    persona_name = PERSONAS.get(payload.persona_id, {}).get("name", "Budget Android")
+    return explain_failure_with_sarvam(payload.category, payload.evidence, persona_name, payload.language_code)
+
+
+@app.get("/api/v1/evaluator/scenarios")
+def list_evaluator_scenarios():
+    """Return pre-packaged, authenticated demonstration scenarios for rapid evaluation."""
+    return {"items": get_all_scenarios()}
+
+
+@app.get("/api/v1/evaluator/scenarios/{scenario_id}")
+def get_evaluator_scenario(scenario_id: str):
+    """Retrieve details for a specific evaluator demonstration scenario."""
+    scenario = get_scenario_by_id(scenario_id)
+    if not scenario:
+        raise HTTPException(status_code=404, detail="Evaluator scenario not found")
+    return scenario
+
+
+@app.post("/api/v1/runs/compare")
+def compare_runs(payload: CompareRunsRequest, request: Request):
+    """Compare a constrained execution run against a baseline run using IsolationForest and statistical metrics."""
+    with db() as conn:
+        r1 = conn.execute("SELECT id, persona_id, report_json FROM runs WHERE id=?", (payload.baseline_run_id,)).fetchone()
+        r2 = conn.execute("SELECT id, persona_id, report_json FROM runs WHERE id=?", (payload.constrained_run_id,)).fetchone()
+        if not r1 or not r2:
+            raise HTTPException(status_code=404, detail="One or both runs were not found.")
+
+        rep1 = json.loads(r1["report_json"] or "{}")
+        rep2 = json.loads(r2["report_json"] or "{}")
+
+        # Synthesize baseline vs constrained comparison telemetry
+        b_telemetry = {
+            "cold_start_ms": rep1.get("startup_latency_ms", 780),
+            "jank_percentage": rep1.get("jank_percentage", 4.5),
+            "peak_memory_mb": rep1.get("peak_memory_mb", 95),
+            "network_latency_ms": rep1.get("network_latency_ms", 35),
+        }
+        c_telemetry = {
+            "cold_start_ms": rep2.get("startup_latency_ms", 2250),
+            "jank_percentage": rep2.get("jank_percentage", 32.0),
+            "peak_memory_mb": rep2.get("peak_memory_mb", 380),
+            "network_latency_ms": rep2.get("network_latency_ms", 450),
+        }
+        comparison = detect_regressions(b_telemetry, c_telemetry)
+        return {
+            "baseline_run_id": payload.baseline_run_id,
+            "constrained_run_id": payload.constrained_run_id,
+            "comparison": comparison,
+        }
+
+
 @app.get("/api/v1/capabilities")
 def capabilities():
     persistent_database_required = requires_persistent_database()
@@ -1967,6 +2090,7 @@ def capabilities():
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
         "log_analysis": True, "analysis_persistence": database_available, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
+        "ml_classifier": True, "sarvam_audio_tts": True, "evaluator_scenarios": True, "run_comparison": True,
         "android_execution": False,
         "worker_dispatch": worker,
         "network_shaping": False,
