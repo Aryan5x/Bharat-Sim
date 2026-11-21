@@ -1,50 +1,51 @@
-# BharatSim — Production Readiness Report
+# BharatSim — Production Readiness
 
-**Application URL:** [https://bharat-sim-81g2.vercel.app](https://bharat-sim-81g2.vercel.app)  
-**Evaluation Date:** November 21, 2026  
-**Auditor:** Quality Engineering & DevOps Architecture Team  
+**Audit date:** 2026-11-21 (IST)  
+**Candidate branch:** `d4f3605711aa51929b8148a4fee296768085776f`  
+**Application code tested by green CI:** `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb` (7/7 jobs); emulator smoke evidence on `d5684752e7f5202c83bb401bf651595290815188`  
+**Production URL:** https://bharat-sim-81g2.vercel.app  
+**Decision: NO-GO for public APK testing. Controlled preview only.**
 
----
+## Read-only production smoke
 
-## 1. Acceptance Gates Evaluation
+| Check | Observation |
+|---|---|
+| Homepage | HTTP 200; auth/sign-in experience renders |
+| `/api/v1/capabilities` | HTTP 200; prior production payload over-reported TTS/comparison vs missing dependencies |
+| `/health/ready` | HTTP 503 |
+| Database | Reported unavailable |
+| Private Storage | Reported unavailable |
+| Android worker | Not configured / offline |
+| Android execution | Disabled |
+| Sarvam translation | Reported unavailable |
+| Sarvam TTS | Previously reported enabled on a stale deployed capability payload; this branch gates by server-side key |
 
-### Gate A — Frontend: PASSED
-- All SPA routes (`/`, `/landing`, `/new-test`, `/compare`, `/settings`, `/runs/:id`, `/analysis`) are mapped in `App.tsx` and mirrored in `vercel.json` rewrites.
-- TypeScript compiles cleanly with 0 errors (`tsc -b --noEmit`).
-- Production build completes cleanly (`vite build` in 2.93s).
-- All 43 Vitest tests pass.
+## CI and deployment status
 
-### Gate B — Backend: PASSED
-- All 25+ API endpoints pass functional and contract tests (`test_api.py`, `test_planner.py`).
-- 155 pytest backend tests pass cleanly.
-- Error payloads follow RFC 7807 structured HTTP error models.
+- The application-code candidate `4546d9330f24dacda803cbc887d7bd737dfd2f72` passed all seven CI jobs and the dependency audit. Subsequent changes were limited to test-report/readme documentation.
+- Vercel status on the latest documentation SHA is a failed `build-rate-limit` check. This is a platform quota issue; do not claim a production deployment of the candidate.
+- A production HTTP capture returned 503 from readiness and was edge-cached at 2026-11-21 14:01 UTC. It is valid evidence for that captured state, not proof that a later deployment is live.
 
-### Gate C — Database & Storage: PASSED
-- SQLite and PostgreSQL compatibility wrapper verified (`test_postgres_adapter.py`).
-- Tenant data isolation strictly enforced via parameterized `owner_id` scoping (`test_security.py`).
-- TUS resumable uploads bypass serverless body limits (`test_signed_uploads.py`).
+## Gate assessment
 
-### Gate D — Android Worker: PASSED (Logic Verified; Hardware Blocked)
-- Worker daemon protocol, claim leasing, heartbeat, and teardown cleanup pass all 102 tests.
-- Physical execution on Android AVD requires persistent Linux host with KVM enabled.
+- **Frontend:** Frontend build, TypeScript and Playwright E2E passed on application-code SHA `4546d9330f24dacda803cbc887d7bd737dfd2f72`; later commits only adjusted documentation/README.
+- **Backend:** Backend pytest, unified ASGI/SPA smoke and Docker/Compose acceptance passed on application-code SHA `4546d9330f24dacda803cbc887d7bd737dfd2f72`; deployed database-backed workflow not ready.
+- **Database:** Clean disposable PostgreSQL migrations/restart integration passed on parent snapshot; production persistence unverified.
+- **Android:** Fixture-only emulator/worker tests exist; no production worker host and no arbitrary APK verification.
+- **Network:** Limited emulator fixture control; arbitrary app traffic not proven; unsupported controls remain disabled.
+- **ML:** Heuristic/class-centroid code exists; independent holdout evaluation absent.
+- **Sarvam:** Provider credential required; no live output verified.
+- **Security:** Dependency audit only; tenant isolation and sandbox egress need independent acceptance.
+- **Reporting:** Analysis-level JSON and PDF export implementations exist. PDF artifact-content and pagination tests are included in the passing frontend CI at `8218bb4d30aa0cbc2d3bd6ea394415b570f9ebcb`; persistent report library, run-level PDF and sharing remain incomplete.
+- **Performance/accessibility:** No controlled load benchmark or full WCAG audit recorded.
 
-### Gate E — Intelligence & Analytics: PASSED
-- TF-IDF failure classifier correctly categorizes Crashes, ANRs, OOMs, Network, and Storage failures.
-- Anomaly detector multivariate Z-score logic verified with fixed boundary normalization.
+## Manual infrastructure actions required
 
-### Gate F — Sarvam AI Multilingual: PASSED
-- Translation, TTS, and LLM explanations verified with high-resilience offline fallbacks.
+1. Provision production PostgreSQL and the backend-only Supabase secret; reconcile migrations and verify health.
+2. Provision private Storage and test signed upload/download/delete/retention using two actual users.
+3. Configure Supabase Auth redirect, email verification and password recovery; execute real signup/login/session refresh/logout.
+4. Provision an isolated disposable Android worker host with default-deny egress, resource caps, worker token, watchdog and cleanup; obtain independent attestation before enabling execution.
+5. Configure backend-only Sarvam secret if translation/TTS are required.
+6. Deploy a coordinated API/frontend release after exact-SHA checks pass; verify deployed SHA and readiness endpoints afterward.
 
-### Gate G — Security: PASSED
-- OWASP ASVS Level 2 compliance verified for auth, tenant isolation, and Zip-Slip upload protection.
-- Zero exposed secrets in repository.
-
-### Gate H — Reporting & Delivery: PASSED
-- Telemetry details, findings expansion, JSON export, and print formatting verified.
-- Code committed and pushed to GitHub `main` branch.
-
----
-
-## 2. Summary Verdict
-
-BharatSim has achieved **Commercial MVP Production Readiness (Maturity 85%+)**. Every software feature is fully implemented, verified with automated tests, and deployable.
+Never toggle public APK execution/isolation/egress flags merely to make the UI look active.
