@@ -35,6 +35,7 @@ import {
 
 import PersonaPanel from "./components/PersonaPanel";
 import UploadPanel from "./components/UploadPanel";
+import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from "./components/CustomPersonaBuilder";
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
@@ -55,6 +56,7 @@ export default function App() {
 
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
+  const [customPersona, setCustomPersona] = useState<CustomPersona>(DEFAULT_CUSTOM_PERSONA);
   const [runs, setRuns] = useState<Run[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(() => previewMode ? null : loadSavedAnalysis(readSession()?.user?.id));
   const [logText, setLogText] = useState("");
@@ -162,6 +164,11 @@ export default function App() {
         throw new Error("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
       }
       if (!apk) throw new Error("Choose an APK file first.");
+      if (selected === "custom") {
+        const problems = customPersonaErrors(customPersona);
+        if (problems.length) throw new Error("Fix the custom persona first: " + problems.join("; "));
+      }
+      const personaFields = selected === "custom" ? { persona_id: "custom", custom_persona: customPersona } : { persona_id: selected };
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
         if (!globalThis.crypto?.subtle) throw new Error("Secure file hashing is unavailable in this browser.");
@@ -172,7 +179,7 @@ export default function App() {
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ persona_id: selected, filename: apk.name, size_bytes: apk.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: apk.name, size_bytes: apk.size, sha256 })
           });
           savePendingApkUpload(sha256, apk, ticket);
         } else {
@@ -189,7 +196,7 @@ export default function App() {
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ persona_id: selected, filename: apk.name, size_bytes: apk.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: apk.name, size_bytes: apk.size, sha256 })
           });
           savePendingApkUpload(sha256, apk, ticket);
           setNotice("The previous upload expired. Restarting securely with a fresh upload ticket…");
@@ -206,7 +213,8 @@ export default function App() {
           throw new Error("Large APK upload is unavailable until private Supabase Storage is configured. This deployment can accept files up to 4 MB.");
         }
         const body = new FormData();
-        body.append("persona_id", selected);
+        body.append("persona_id", personaFields.persona_id);
+        if (selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
         body.append("apk", apk);
         run = await api<Run & { message: string }>("/api/v1/runs", {
           method: "POST",
@@ -578,6 +586,8 @@ export default function App() {
                     setApk={setApk}
                     selected={selected}
                     setSelected={setSelected}
+                    customPersona={customPersona}
+                    setCustomPersona={setCustomPersona}
                     personas={personas}
                     workers={workers}
                     busy={busy}
@@ -804,7 +814,7 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <RunsTable runs={runs} personas={personas} />
+                    <RunsTable runs={runs} personas={personas} onDeleted={() => refresh(true)} />
                   )}
                 </section>
               }

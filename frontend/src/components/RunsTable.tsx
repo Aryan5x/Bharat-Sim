@@ -1,17 +1,35 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, X } from "lucide-react";
-import { type Run, type Persona, date, displayRunStatus, isRunActive } from "../api";
+import { LoaderCircle, Search, Trash2, X } from "lucide-react";
+import { type Run, type Persona, api, date, displayRunStatus, isRunActive } from "../api";
 
 interface RunsTableProps {
   runs: Run[];
   personas: Persona[];
+  onDeleted?: () => void;
 }
 
 type StatusFilter = "all" | "active" | "completed" | "failed";
 
-export default function RunsTable({ runs, personas }: RunsTableProps) {
+export default function RunsTable({ runs, personas, onDeleted }: RunsTableProps) {
   const navigate = useNavigate();
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function deleteRun(run: Run) {
+    const label = run.apk_name || run.id;
+    if (!window.confirm(`Delete the run for "${label}"? Its report, evidence and uploaded APK are removed permanently.`)) return;
+    setDeleteError("");
+    setDeleting(run.id);
+    try {
+      await api("/api/v1/runs/" + encodeURIComponent(run.id), { method: "DELETE" });
+      onDeleted?.();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "Could not delete the run.");
+    } finally {
+      setDeleting(null);
+    }
+  }
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
 
@@ -67,6 +85,13 @@ export default function RunsTable({ runs, personas }: RunsTableProps) {
         </p>
       </div>
 
+      {deleteError && (
+        <div className="alert error-alert" role="alert">
+          <span>{deleteError}</span>
+          <button type="button" onClick={() => setDeleteError("")} aria-label="Dismiss"><X size={14} /></button>
+        </div>
+      )}
+
       {filteredRuns.length === 0 ? (
         <div className="empty-state runs-empty">
           <div className="empty-icon"><Search size={21} /></div>
@@ -86,6 +111,7 @@ export default function RunsTable({ runs, personas }: RunsTableProps) {
                 <th>CREATED</th>
                 <th>STATUS</th>
                 <th>APK SHA-256</th>
+                <th><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -117,6 +143,18 @@ export default function RunsTable({ runs, personas }: RunsTableProps) {
                       </span>
                     </td>
                     <td><code title={run.apk_sha256 || undefined}>{run.apk_sha256?.slice(0, 16) || "—"}</code></td>
+                    <td>
+                      <button
+                        type="button"
+                        className="row-delete"
+                        onClick={() => deleteRun(run)}
+                        disabled={deleting !== null || run.status === "leased" || run.status === "running"}
+                        title={run.status === "leased" || run.status === "running" ? "Wait for the run to finish before deleting it" : "Delete this run"}
+                        aria-label={`Delete run ${run.apk_name || run.id}`}
+                      >
+                        {deleting === run.id ? <LoaderCircle className="spin" size={14} /> : <Trash2 size={14} />}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
