@@ -23,6 +23,7 @@ import {
 } from "../api";
 
 import EvaluatorTourBanner from "./EvaluatorTourBanner";
+import Spotlight from "./Animated/Spotlight";
 
 interface DashboardOverviewProps {
   personas: Persona[];
@@ -52,7 +53,8 @@ export default function DashboardOverview({
   const activeWorkersCount = workers.filter((w) => w.online).length;
 
   return (
-    <div className="dashboard-overview-container">
+    <div className="dashboard-overview-container relative overflow-hidden" style={{ position: "relative" }}>
+      <Spotlight fill="#10b981" />
       {/* Evaluator Quick Tour Banner */}
       <EvaluatorTourBanner onLoadScenario={onLoadScenario} />
 

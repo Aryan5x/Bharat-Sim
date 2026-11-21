@@ -241,3 +241,4 @@ echo "   sudo systemctl enable --now bharatsim-worker"
 echo "4. Monitor service status:"
 echo "   sudo journalctl -u bharatsim-worker -f"
 echo "===================================================================="
+

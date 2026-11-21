@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, lazy, Suspense, type FormEvent } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import {
   Activity,
@@ -37,18 +37,22 @@ import UploadPanel from "./components/UploadPanel";
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
-import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
 import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-import LandingPage from "./components/LandingPage";
-import DashboardOverview from "./components/DashboardOverview";
-import NewTestWizard from "./components/NewTestWizard";
-import CompareRunsView from "./components/CompareRunsView";
-import SettingsView from "./components/SettingsView";
+import InferenceLoader from "./components/Animated/InferenceLoader";
+import ParticleField from "./components/Effects/ParticleField";
+
+// Lazy-loaded routes for code-splitting and rapid initial paint
+const LandingPage = lazy(() => import("./components/LandingPage"));
+const DashboardOverview = lazy(() => import("./components/DashboardOverview"));
+const NewTestWizard = lazy(() => import("./components/NewTestWizard"));
+const CompareRunsView = lazy(() => import("./components/CompareRunsView"));
+const SettingsView = lazy(() => import("./components/SettingsView"));
+const RunDetailView = lazy(() => import("./components/RunDetailView"));
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
 import { isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
@@ -308,6 +312,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <ParticleField />
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => {
@@ -361,7 +366,8 @@ export default function App() {
             </div>
           )}
 
-          <Routes>
+          <Suspense fallback={<InferenceLoader text="Loading BharatSim workspace..." />}>
+            <Routes>
             {/* Overview route */}
             <Route
               path="/"
@@ -825,6 +831,7 @@ export default function App() {
               }
             />
           </Routes>
+          </Suspense>
 
           <footer>
             <span>

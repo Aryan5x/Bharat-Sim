@@ -63,3 +63,4 @@ $$\mathbf{305\text{ passed}} + \mathbf{2\text{ skipped}} = \mathbf{307\text{ act
 3. **API Routing:** Verified that `vercel.json` rewrites are deployed, preventing 404 errors on `/landing`, `/new-test`, `/compare`, and `/settings`.
 4. **Android Worker:** `worker/agent.py` and `worker/runner.py` hardened with signal handling, `stdin=subprocess.DEVNULL`, and structured logging.
 5. **Turnkey Deployment Package:** Created `deploy/worker/setup-worker-host.sh`, `deploy/worker/Dockerfile.kvm`, `deploy/worker/docker-compose.yml`, and `deploy/worker/README.md`.
+

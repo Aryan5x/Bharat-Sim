@@ -45,3 +45,4 @@ The test journey defined in `scripts/ci/android-emulator-e2e.sh` executes 4 dist
 
 ### Scenario 4: Appium UIAutomator2 End-to-End Automation
 - **Test:** Appium server connects to `emulator-5554`, finds `primary-action`, triggers button click, verifies UI status change to `"Primary action completed"`, and records HTTPS transfer times under shaped network conditions.
+

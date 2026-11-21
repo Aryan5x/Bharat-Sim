@@ -29,3 +29,4 @@ BharatSim guarantees that every reported number reflects a verifiable diagnostic
 1. **Never Display Synthetic Defaults as Zero:** If a metric (e.g. `gfxinfo`) cannot be collected because an app crashed before rendering its first frame, BharatSim records `null` rather than `0.0%`.
 2. **UI Communication:** The frontend dashboard explicitly renders missing metrics with a designated `—` dash and a tooltip explaining `"Not recorded for this run"`.
 3. **Run Comparison Safety:** `POST /api/v1/runs/compare` checks intersection of common metrics between baseline and constrained runs. If no overlapping metrics exist, it returns `422 Unprocessable Entity` with a clear explanation rather than inventing artificial delta numbers.
+

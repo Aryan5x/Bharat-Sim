@@ -41,3 +41,4 @@ stateDiagram-v2
 ### 2.4 Idempotent Job Completion
 - **Risk:** If a job lease expires and another worker is leased the run, duplicate result submissions must not corrupt the database.
 - **Hardening:** The API's `/internal/worker/runs/{id}/result` endpoint checks lease tokens and ignores stale duplicate callbacks, returning clean status codes.
+

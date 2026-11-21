@@ -41,3 +41,4 @@
 ### Gate H — Deployment: VERIFIED
 - Vercel frontend and FastAPI backend deployed at `https://bharat-sim-81g2.vercel.app`.
 - All single-page application routes mapped in `vercel.json` rewrites.
+

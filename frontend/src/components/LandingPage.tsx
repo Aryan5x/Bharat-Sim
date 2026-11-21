@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { type Persona, type EvaluatorScenario, fallbackPersonas } from "../api";
 import EvaluatorTourBanner from "./EvaluatorTourBanner";
+import Spotlight from "./Animated/Spotlight";
+import Marquee from "./Animated/Marquee";
 
 interface LandingPageProps {
   onStartTesting: () => void;
@@ -51,8 +53,9 @@ export default function LandingPage({
 
   return (
     <div className="landing-container">
-      {/* Hero Section */}
-      <section className="landing-hero">
+      {/* Hero Section with Ambient Electric Emerald Spotlight */}
+      <section className="landing-hero relative overflow-hidden" style={{ position: "relative", overflow: "hidden" }}>
+        <Spotlight fill="#10b981" />
         <div className="landing-hero-badge">
           <span className="badge-pulse" />
           <span>BHARATSIM 2.0 · THE CHEAP PHONE TEST</span>
@@ -86,6 +89,53 @@ export default function LandingPage({
             <Layers size={16} />
             <span>Explore Risk Planner</span>
           </button>
+        </div>
+
+        {/* Dynamic Telemetry & Spec Marquee */}
+        <div className="landing-marquee-wrapper" style={{ margin: "24px 0 28px" }}>
+          <Marquee speed={32} pauseOnHover={true}>
+            {[
+              { tag: "Hardware", text: "Budget Android · 2GB RAM · 720p · Android 11" },
+              { tag: "Rural 2G", text: "Edge Village · 450ms Latency · 8% Packet Loss" },
+              { tag: "Transit", text: "Crowded Railway Station · 320ms Latency · 3G Cell" },
+              { tag: "ML Engine", text: "Zero-DLL TF-IDF Failure Classifier · < 1ms Inference" },
+              { tag: "Sarvam AI", text: "Bulbul TTS Hindi / Tamil / Marathi Voice Briefings" },
+              { tag: "Telemetry", text: "dumpsys gfxinfo (Jank Frames) & dumpsys meminfo (PSS)" },
+              { tag: "Storage", text: "TUS Resumable Chunked Uploads + SHA-256 Checksum" },
+              { tag: "Heuristic", text: "Transparent Bharat Readiness Score (0-100)" }
+            ].map((item, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "rgba(14, 17, 24, 0.9)",
+                  border: "1px solid rgba(16, 185, 129, 0.25)",
+                  borderRadius: "9999px",
+                  padding: "6px 14px",
+                  fontSize: "12px",
+                  color: "#cbd5e1",
+                  whiteSpace: "nowrap",
+                  boxShadow: "0 2px 10px rgba(0,0,0,0.3)"
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontFamily: "var(--mono)",
+                    background: "rgba(16, 185, 129, 0.15)",
+                    color: "#34d399",
+                    borderRadius: "4px",
+                    padding: "2px 6px"
+                  }}
+                >
+                  {item.tag}
+                </span>
+                <span style={{ fontWeight: 500 }}>{item.text}</span>
+              </div>
+            ))}
+          </Marquee>
         </div>
 
         {/* Quick Evaluator Scenario Tour Banner embedded in Landing */}
