@@ -215,6 +215,8 @@ test("workspace deep links render after direct browser navigation", async ({ pag
 
 
 test("workspace sections never overlap at common desktop, tablet and phone widths", async ({ page }) => {
+  // Measure stable layout geometry, not intentional staggered entrance transforms.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await installLocalWorkspaceSession(page);
   const widths = [320, 375, 520, 720, 768, 1024, 1280, 1440];
   for (const width of widths) {
