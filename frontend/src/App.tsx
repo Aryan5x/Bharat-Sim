@@ -13,7 +13,9 @@ import {
   Gauge,
   Layers3,
   LoaderCircle,
+  Moon,
   RefreshCw,
+  Sun,
   ShieldCheck,
   Smartphone,
   X
@@ -54,6 +56,9 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const previewMode = isDemoMode();
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    document.documentElement.dataset.theme === "light" ? "light" : "dark"
+  );
 
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
@@ -75,6 +80,15 @@ export default function App() {
   useEffect(() => {
     if (analysis && !previewMode) saveAnalysisForSession(readSession()?.user?.id, analysis);
   }, [analysis]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute(
+      "content",
+      theme === "dark" ? "#0b1020" : "#f4f7fc"
+    );
+    try { window.localStorage.setItem("bharatsim.theme", theme); } catch { /* Storage may be disabled. */ }
+  }, [theme]);
 
 
   const currentTab = location.pathname.startsWith("/runs")
@@ -407,6 +421,14 @@ export default function App() {
                 : "checking"}
             </span>
             <button
+              className="icon-button theme-toggle"
+              onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")}
+              aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
               className="icon-button"
               onClick={() => void refresh()}
               aria-label="Refresh data"
@@ -575,6 +597,16 @@ export default function App() {
               path="/"
               element={
                 <div className="dashboard-grid">
+                  <EvaluatorTourBanner
+                    onLoadScenario={(scenario) => {
+                      setSelected(scenario.persona_id);
+                      setLogText(scenario.logcat);
+                      setNotice("Loaded a curated scenario fixture into log analysis. This is sample evidence, not an executed APK run.");
+                      window.setTimeout(() => {
+                        document.getElementById("log-panel")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }, 40);
+                    }}
+                  />
                   <PersonaPanel
                     personas={personas}
                     selected={selected}
@@ -602,7 +634,7 @@ export default function App() {
 
                   <PlannerPanel selected={selected} />
 
-                  <section className="panel log-panel">
+                  <section id="log-panel" className="panel log-panel">
                     <div className="panel-heading">
                       <div>
                         <div className="section-kicker">03 / EVIDENCE ANALYSIS</div>

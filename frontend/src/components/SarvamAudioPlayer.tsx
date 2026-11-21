@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX, LoaderCircle } from "lucide-react";
 import { synthesizeSpeechAudio } from "../api";
 
@@ -18,7 +18,7 @@ const LANGUAGES = [
 export default function SarvamAudioPlayer({
   text,
   defaultLang = "hi-IN",
-  label = "Listen to Diagnostic Briefing (Sarvam AI Bulbul TTS)"
+  label = "Listen to diagnostic briefing (Sarvam Bulbul TTS)"
 }: SarvamAudioPlayerProps) {
   const [lang, setLang] = useState(defaultLang);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -26,6 +26,14 @@ export default function SarvamAudioPlayer({
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    };
+  }, []);
 
   const handlePlay = async () => {
     if (playing && audioRef.current) {
@@ -35,71 +43,79 @@ export default function SarvamAudioPlayer({
     }
 
     if (audioUrl && audioRef.current) {
-      audioRef.current.play();
-      setPlaying(true);
+      try {
+        await audioRef.current.play();
+        setPlaying(true);
+      } catch {
+        setError("The browser could not start audio playback.");
+      }
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      // Synthesize audio via backend Bulbul TTS endpoint
-      const snippet = text.slice(0, 500);
-      const res = await synthesizeSpeechAudio(snippet, lang);
-      if (!res.audio_content) {
-        throw new Error("No audio content returned from Sarvam API");
+      const response = await synthesizeSpeechAudio(text.slice(0, 500), lang);
+
+      // The API deliberately returns an explicitly marked silent fixture when
+      // SARVAM_API_KEY is absent. Never present that fixture as spoken output.
+      if (response.is_fixture) {
+        throw new Error(response.note || "Sarvam speech generation is not configured. No spoken audio was generated.");
+      }
+      if (!response.audio_base64) {
+        throw new Error("Sarvam returned an empty audio response.");
       }
 
-      // Convert base64 to data URL or blob URL
-      const byteCharacters = atob(res.audio_content);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      const binary = atob(response.audio_base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
       }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: res.content_type || "audio/wav" });
+      const blob = new Blob([bytes], { type: response.format || "audio/wav" });
       const url = URL.createObjectURL(blob);
-      setAudioUrl(url);
-
-      // Play audio
+      objectUrlRef.current = url;
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => setPlaying(false);
       audio.onerror = () => {
         setPlaying(false);
-        setError("Playback failed");
+        setError("Audio playback failed.");
       };
+      setAudioUrl(url);
       await audio.play();
       setPlaying(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "TTS synthesis failed");
+      setError(err instanceof Error ? err.message : "Speech synthesis failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLanguageChange = (newLang: string) => {
-    setLang(newLang);
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+  const handleLanguageChange = (newLanguage: string) => {
+    audioRef.current?.pause();
+    audioRef.current = null;
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = null;
     setAudioUrl(null);
     setPlaying(false);
+    setError(null);
+    setLang(newLanguage);
   };
 
   return (
     <div className="sarvam-audio-player">
       <div className="audio-player-header">
         <span className="audio-label">{label}</span>
-        <div className="audio-lang-selector">
-          {LANGUAGES.map((l) => (
+        <div className="audio-lang-selector" aria-label="Audio language">
+          {LANGUAGES.map((language) => (
             <button
-              key={l.code}
+              key={language.code}
               type="button"
-              className={"lang-chip " + (lang === l.code ? "active" : "")}
-              onClick={() => handleLanguageChange(l.code)}
+              className={"lang-chip " + (lang === language.code ? "active" : "")}
+              aria-pressed={lang === language.code}
+              onClick={() => handleLanguageChange(language.code)}
             >
-              {l.name}
+              {language.name}
             </button>
           ))}
         </div>
@@ -111,7 +127,7 @@ export default function SarvamAudioPlayer({
           className={"audio-play-button " + (playing ? "playing" : "")}
           onClick={() => void handlePlay()}
           disabled={loading || !text.trim()}
-          title={playing ? "Pause briefing" : "Play audio briefing"}
+          title={playing ? "Pause briefing" : "Generate and play voice briefing"}
         >
           {loading ? (
             <LoaderCircle size={15} className="spin" />
@@ -120,22 +136,11 @@ export default function SarvamAudioPlayer({
           ) : (
             <Volume2 size={15} />
           )}
-          <span>{loading ? "Generating Audio…" : playing ? "Pause Audio" : "Play Voice Briefing"}</span>
+          <span>{loading ? "Generating audio…" : playing ? "Pause audio" : audioUrl ? "Play audio" : "Generate voice briefing"}</span>
         </button>
-
-        {playing && (
-          <div className="audio-wave-indicator" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-        )}
       </div>
 
-      {error && <span className="audio-error">{error}</span>}
+      {error && <span className="audio-error" role="status">{error}</span>}
     </div>
   );
 }
-

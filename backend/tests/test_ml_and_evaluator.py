@@ -2,6 +2,15 @@
 from __future__ import annotations
 
 import pytest
+import json
+import sqlite3
+from contextlib import contextmanager
+
+from fastapi import HTTPException
+from starlette.requests import Request
+
+from backend.app import main as main_module
+from backend.app.main import CompareRunsRequest
 from fastapi.testclient import TestClient
 
 from backend.app.anomaly_detector import detect_regressions
@@ -72,6 +81,7 @@ def test_anomaly_detector_regressions():
     }
     result = detect_regressions(baseline, constrained)
     assert result["regression_count"] >= 2
+    assert 0 <= result["anomaly_score"] <= 100
     metrics = [a["metric"] for a in result["anomalies"]]
     assert "cold_start_ms" in metrics
     assert "jank_percentage" in metrics
@@ -152,10 +162,99 @@ def test_analyze_logs_with_ml_enrichment(client):
     assert res.status_code == 200
     data = res.json()
     assert "ml_pipeline" in data
-    assert data["ml_pipeline"]["algorithm"] == "TfidfVectorizer + LogisticRegression"
+    assert data["ml_pipeline"]["algorithm"] == "TF-IDF weighted class-centroid classifier (portable pure Python)"
     assert data["summary"]["finding_count"] >= 2
     # Verify Sarvam explanation is attached to findings
     first_finding = data["findings"][0]
     assert "sarvam_explanation" in first_finding
     assert "code_remedy" in first_finding["sarvam_explanation"]
 
+
+
+def _comparison_test_db(rows):
+    connection = sqlite3.connect(":memory:")
+    connection.row_factory = sqlite3.Row
+    connection.execute(
+        "CREATE TABLE runs (id TEXT PRIMARY KEY, persona_id TEXT, status TEXT, result_json TEXT, owner_id TEXT)"
+    )
+    connection.executemany(
+        "INSERT INTO runs(id,persona_id,status,result_json,owner_id) VALUES(?,?,?,?,?)",
+        rows,
+    )
+    return connection
+
+
+def _comparison_request(owner_id: str):
+    request = Request({"type": "http", "method": "POST", "path": "/api/v1/runs/compare", "headers": []})
+    request.state.owner_id = owner_id
+    return request
+
+
+def test_run_comparison_uses_owner_scoped_persisted_telemetry(monkeypatch):
+    rows = [
+        ("base", "baseline", "completed", json.dumps({
+            "telemetry_gfx": {"jank_percentage": 4.0},
+            "telemetry_mem": {"total_pss_mb": 90.0},
+        }), "owner-a"),
+        ("constrained", "budget-android", "completed", json.dumps({
+            "telemetry_gfx": {"jank_percentage": 36.0},
+            "telemetry_mem": {"total_pss_mb": 290.0},
+        }), "owner-a"),
+        ("foreign", "baseline", "completed", json.dumps({
+            "telemetry_gfx": {"jank_percentage": 1.0},
+        }), "owner-b"),
+    ]
+    connection = _comparison_test_db(rows)
+
+    @contextmanager
+    def fake_db():
+        yield connection
+
+    monkeypatch.setattr(main_module, "db", fake_db)
+    result = main_module.compare_runs(
+        CompareRunsRequest(baseline_run_id="base", constrained_run_id="constrained"),
+        _comparison_request("owner-a"),
+    )
+
+    assert result["baseline_metrics"] == {"jank_percentage": 4.0, "peak_memory_mb": 90.0}
+    assert result["constrained_metrics"] == {"jank_percentage": 36.0, "peak_memory_mb": 290.0}
+    assert result["anomaly_detected"] is True
+    assert 0 <= result["anomaly_score"] <= 100
+
+
+def test_run_comparison_hides_foreign_owner_run(monkeypatch):
+    connection = _comparison_test_db([
+        ("base", "baseline", "completed", json.dumps({"telemetry_gfx": {"jank_percentage": 4.0}}), "owner-a"),
+        ("foreign", "baseline", "completed", json.dumps({"telemetry_gfx": {"jank_percentage": 1.0}}), "owner-b"),
+    ])
+
+    @contextmanager
+    def fake_db():
+        yield connection
+
+    monkeypatch.setattr(main_module, "db", fake_db)
+    with pytest.raises(HTTPException) as exc:
+        main_module.compare_runs(
+            CompareRunsRequest(baseline_run_id="base", constrained_run_id="foreign"),
+            _comparison_request("owner-a"),
+        )
+    assert exc.value.status_code == 404
+
+
+def test_run_comparison_rejects_missing_measured_metrics(monkeypatch):
+    connection = _comparison_test_db([
+        ("base", "baseline", "completed", "{}", "owner-a"),
+        ("constrained", "budget-android", "completed", "{}", "owner-a"),
+    ])
+
+    @contextmanager
+    def fake_db():
+        yield connection
+
+    monkeypatch.setattr(main_module, "db", fake_db)
+    with pytest.raises(HTTPException) as exc:
+        main_module.compare_runs(
+            CompareRunsRequest(baseline_run_id="base", constrained_run_id="constrained"),
+            _comparison_request("owner-a"),
+        )
+    assert exc.value.status_code == 422

@@ -972,7 +972,7 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
         },
         "ml_pipeline": {
             "model_version": "1.0.0",
-            "algorithm": "TfidfVectorizer + LogisticRegression",
+            "algorithm": "TF-IDF weighted class-centroid classifier (portable pure Python)",
             "signals_classified": len(ml_matches),
             "signal_counts": ml_counts,
         },
@@ -2044,36 +2044,131 @@ def get_evaluator_scenario(scenario_id: str):
 
 @app.post("/api/v1/runs/compare")
 def compare_runs(payload: CompareRunsRequest, request: Request):
-    """Compare a constrained execution run against a baseline run using IsolationForest and statistical metrics."""
+    """Compare owner-scoped completed runs using persisted telemetry only."""
+    if payload.baseline_run_id == payload.constrained_run_id:
+        raise HTTPException(status_code=400, detail="Choose two different runs to compare.")
+
+    owner_id = getattr(request.state, "owner_id", None)
     with db() as conn:
-        r1 = conn.execute("SELECT id, persona_id, report_json FROM runs WHERE id=?", (payload.baseline_run_id,)).fetchone()
-        r2 = conn.execute("SELECT id, persona_id, report_json FROM runs WHERE id=?", (payload.constrained_run_id,)).fetchone()
-        if not r1 or not r2:
+        if owner_id is None:
+            baseline_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id IS NULL",
+                (payload.baseline_run_id,),
+            ).fetchone()
+            constrained_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id IS NULL",
+                (payload.constrained_run_id,),
+            ).fetchone()
+        else:
+            baseline_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id=?",
+                (payload.baseline_run_id, owner_id),
+            ).fetchone()
+            constrained_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id=?",
+                (payload.constrained_run_id, owner_id),
+            ).fetchone()
+
+        # Use the same not-found response for missing and foreign-owned IDs.
+        if not baseline_row or not constrained_row:
             raise HTTPException(status_code=404, detail="One or both runs were not found.")
+        if baseline_row["status"] != "completed" or constrained_row["status"] != "completed":
+            raise HTTPException(status_code=409, detail="Only completed runs with worker reports can be compared.")
 
-        rep1 = json.loads(r1["report_json"] or "{}")
-        rep2 = json.loads(r2["report_json"] or "{}")
+        try:
+            baseline_report = json.loads(baseline_row["result_json"] or "{}")
+            constrained_report = json.loads(constrained_row["result_json"] or "{}")
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="A run contains an invalid report payload.") from None
 
-        # Synthesize baseline vs constrained comparison telemetry
-        b_telemetry = {
-            "cold_start_ms": rep1.get("startup_latency_ms", 780),
-            "jank_percentage": rep1.get("jank_percentage", 4.5),
-            "peak_memory_mb": rep1.get("peak_memory_mb", 95),
-            "network_latency_ms": rep1.get("network_latency_ms", 35),
-        }
-        c_telemetry = {
-            "cold_start_ms": rep2.get("startup_latency_ms", 2250),
-            "jank_percentage": rep2.get("jank_percentage", 32.0),
-            "peak_memory_mb": rep2.get("peak_memory_mb", 380),
-            "network_latency_ms": rep2.get("network_latency_ms", 450),
-        }
-        comparison = detect_regressions(b_telemetry, c_telemetry)
-        return {
-            "baseline_run_id": payload.baseline_run_id,
-            "constrained_run_id": payload.constrained_run_id,
-            "comparison": comparison,
+    def number(value):
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            match = re.match(r"^\\s*(-?\\d+(?:\\.\\d+)?)", value)
+            return float(match.group(1)) if match else None
+        return None
+
+    def telemetry(report):
+        values = {}
+        startup = number(report.get("startup_latency_ms"))
+        if startup is not None:
+            values["cold_start_ms"] = startup
+
+        gfx = report.get("telemetry_gfx")
+        if isinstance(gfx, dict):
+            jank = number(gfx.get("jank_percentage"))
+            if jank is not None:
+                values["jank_percentage"] = jank
+
+        memory = report.get("telemetry_mem")
+        if isinstance(memory, dict):
+            pss = number(memory.get("total_pss_mb"))
+            if pss is not None:
+                values["peak_memory_mb"] = pss
+
+        network_latency = number(report.get("network_latency_ms"))
+        if network_latency is not None:
+            values["network_latency_ms"] = network_latency
+        return values
+
+    baseline_metrics = telemetry(baseline_report)
+    constrained_metrics = telemetry(constrained_report)
+    common_metrics = sorted(set(baseline_metrics) & set(constrained_metrics))
+    if not common_metrics:
+        raise HTTPException(
+            status_code=422,
+            detail="These runs do not share any persisted comparable telemetry. No synthetic defaults are used.",
+        )
+
+    baseline_metrics = {key: baseline_metrics[key] for key in common_metrics}
+    constrained_metrics = {key: constrained_metrics[key] for key in common_metrics}
+    comparison = detect_regressions(baseline_metrics, constrained_metrics)
+
+    deltas = {}
+    for key in common_metrics:
+        base_value = baseline_metrics[key]
+        constrained_value = constrained_metrics[key]
+        delta = round(constrained_value - base_value, 2)
+        deltas[key] = {
+            "delta": delta,
+            "delta_pct": round((delta / base_value) * 100, 1) if base_value else 0.0,
         }
 
+    anomalies = []
+    for item in comparison["anomalies"]:
+        metric = item["metric"]
+        base_value = number(item.get("baseline"))
+        constrained_value = number(item.get("constrained"))
+        delta = number(item.get("delta"))
+        delta_pct = (
+            round((delta / base_value) * 100, 1)
+            if delta is not None and base_value not in (None, 0)
+            else 0.0
+        )
+        anomalies.append({
+            "metric": metric,
+            "baseline": item.get("baseline"),
+            "constrained": item.get("constrained"),
+            "delta_pct": delta_pct,
+            "status": "severe_anomaly" if item.get("severity") == "critical" else "elevated",
+            "explanation": item.get("explanation", ""),
+        })
+
+    return {
+        "baseline_run_id": payload.baseline_run_id,
+        "constrained_run_id": payload.constrained_run_id,
+        "baseline_metrics": baseline_metrics,
+        "constrained_metrics": constrained_metrics,
+        "deltas": deltas,
+        "anomaly_detected": comparison["is_anomalous"],
+        "anomaly_score": comparison["anomaly_score"],
+        "anomalies": anomalies,
+        "verdict": "Regression signals detected" if comparison["is_anomalous"] else "No thresholded regression signals detected",
+        "details": comparison["summary"],
+    }
 
 @app.get("/api/v1/capabilities")
 def capabilities():
