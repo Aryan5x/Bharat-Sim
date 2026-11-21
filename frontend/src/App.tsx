@@ -47,10 +47,11 @@ import Topbar from "./components/Topbar";
 import LandingPage from "./components/LandingPage";
 import DashboardOverview from "./components/DashboardOverview";
 import NewTestWizard from "./components/NewTestWizard";
+import { downloadAnalysisPdf } from "./pdfExport";
 import CompareRunsView from "./components/CompareRunsView";
 import SettingsView from "./components/SettingsView";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
-import { isDemoMode, readSession } from "./auth";
+import { enterDemoMode, isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 // API_DOCS_URL kept for future use
@@ -61,7 +62,6 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const previewMode = isDemoMode();
-
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
   const [runs, setRuns] = useState<Run[]>([]);
@@ -251,6 +251,10 @@ export default function App() {
   }
 
   async function analyzeLogs(text = logText, personaId = selected) {
+    if (previewMode || (!readSession() && import.meta.env.PROD)) {
+      setError("Log analysis is a private workspace feature. Sign in to analyze logs and save or export reports.");
+      return;
+    }
     if (!text.trim()) {
       setError("Paste logcat output first.");
       return;
@@ -303,7 +307,12 @@ export default function App() {
     a.href = url;
     a.download = "bharatsim-analysis-" + analysis.id.slice(0, 8) + ".json";
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportReportPdf() {
+    if (!analysis) return;
+    downloadAnalysisPdf(analysis);
   }
 
   return (
@@ -570,6 +579,7 @@ export default function App() {
                 <LandingPage
                   onStartTesting={() => navigate("/new-test")}
                   onExplorePlanner={() => {
+                    enterDemoMode();
                     navigate("/");
                     window.setTimeout(() => {
                       document.getElementById("risk-planner")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -590,7 +600,10 @@ export default function App() {
                   onSelectPersona={setSelected}
                   busy={busy}
                   uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
-                  lockedReason={previewMode ? "Sign in to register and execute private APK runs." : undefined}
+                  maxUploadMb={capabilities?.max_upload_mb ?? 150}
+                  lockedReason={previewMode
+                    ? "Sign in to register and execute private APK runs."
+                    : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
                   onSubmit={submitApkFile}
                   onCancel={() => navigate("/")}
                 />
@@ -601,17 +614,33 @@ export default function App() {
             <Route
               path="/compare"
               element={
-                <CompareRunsView
-                  runs={runs}
-                  onBack={() => navigate("/")}
-                />
+                previewMode ? (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <ShieldCheck size={26} />
+                      <b>Private run comparison</b>
+                      <p>Sign in to compare owner-scoped completed runs.</p>
+                    </div>
+                  </section>
+                ) : capabilities?.run_comparison === true ? (
+                  <CompareRunsView runs={runs} onBack={() => navigate("/")} />
+                ) : (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <CircleAlert size={26} />
+                      <b>Run comparison unavailable</b>
+                      <p>Persistent PostgreSQL is not configured for this deployment. Comparison is disabled rather than generating sample metrics.</p>
+                      <button type="button" className="secondary-button" onClick={() => navigate("/")}>Back to overview</button>
+                    </div>
+                  </section>
+                )
               }
             />
 
             {/* Settings route */}
             <Route
               path="/settings"
-              element={<SettingsView />}
+              element={<SettingsView capabilities={capabilities} apiStatus={apiStatus} />}
             />
 
             {/* Test runs list route */}
@@ -701,9 +730,14 @@ export default function App() {
                       <p>Findings are heuristic signals, not confirmed root causes.</p>
                     </div>
                     {analysis && (
-                      <button className="secondary-button" onClick={exportReport}>
-                        <ArrowDownToLine size={15} /> Export JSON
-                      </button>
+                      <div className="report-export-actions">
+                        <button className="secondary-button" onClick={exportReportPdf}>
+                          <ArrowDownToLine size={15} /> Export PDF
+                        </button>
+                        <button className="secondary-button" onClick={exportReport}>
+                          <ArrowDownToLine size={15} /> Export JSON
+                        </button>
+                      </div>
                     )}
                   </div>
 
