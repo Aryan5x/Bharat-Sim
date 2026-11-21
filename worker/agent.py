@@ -239,6 +239,10 @@ def persona_network_cli_args(job: dict[str, Any]) -> list[str]:
         raise WorkerError("persona profile is missing valid network target values") from exc
     if not 0 <= latency <= 2000:
         raise WorkerError("persona latency target is outside the supported 0–2000 ms range")
+    if down == 0 and up == 0:
+        # Zero/zero is the authored baseline sentinel for unrestricted speed,
+        # not a request to apply a zero-kbps network cap.
+        return []
     if not 1 <= down <= 1_000_000 or not 1 <= up <= 1_000_000:
         raise WorkerError("persona throughput target is outside the supported 1–1000000 kbps range")
     if not 0 <= loss <= 100:
