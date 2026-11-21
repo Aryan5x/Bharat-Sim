@@ -158,6 +158,21 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
     }
   }
 
+  async function runGenericSample() {
+    if (!spec) return;
+    setError("");
+    try {
+      const file = await fetchSampleBuild("/samples/fragile-news.apk", "fragile-news.apk");
+      await onSubmitRun(file, {
+        personaId: spec.execution.persona_id,
+        customPersona: spec.execution.custom_persona ?? null,
+        scenario: runScenarioPayload(spec, spec.execution.scenario_id)
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the run.");
+    }
+  }
+
   async function runOwnApk() {
     if (!spec || !ownApk) return;
     await onSubmitRun(ownApk, {
@@ -351,6 +366,12 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
                 <button type="button" className="secondary-button" disabled={!ownApk || busy || previewMode} onClick={() => void runOwnApk()}>
                   <FileUp size={14} /> Run with this plan
                 </button>
+                {spec.execution.mode === "generic" && (
+                  <button type="button" className="text-button" disabled={busy || previewMode} onClick={() => void runGenericSample()}
+                    title="A small test app (no real data) whose news feed crashes on slow networks">
+                    No APK handy? Try the sample Fragile News app
+                  </button>
+                )}
               </div>
             </div>
           )}

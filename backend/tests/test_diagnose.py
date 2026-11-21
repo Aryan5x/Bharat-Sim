@@ -182,3 +182,22 @@ def test_typed_problem_is_classified_by_sarvam(monkeypatch):
 def test_keyword_fallback_recognises_hinglish_crash():
     assert testspec.rule_based_spec(HINGLISH_CRASH).symptom == "crash"
     assert testspec.rule_based_spec("app khulte hi close ho jata hai").symptom == "crash"
+
+
+def test_schema_uses_single_strings_and_parser_splits_them():
+    schema = testspec.model_json_schema()
+    assert schema["properties"]["expected_behaviour"] == {"type": "string"}
+    assert schema["properties"]["clarifications_needed"] == {"type": "string"}
+    content = json.loads(model_reply()["content"])
+    content.update(expected_behaviour="Shows pending; No double charge", clarifications_needed="")
+    parsed = testspec.parse_model_output(json.dumps(content))
+    assert parsed.expected_behaviour == ["Shows pending", "No double charge"] and parsed.clarifications_needed == []
+
+
+def test_clearly_stated_conditions_are_never_dropped():
+    assert "low_storage" in testspec.stated_conditions("Storage full hone par photo save nahi hoti")
+    assert "battery_saver" in testspec.stated_conditions("Battery saver on karne par app lag karta hai")
+    assert "network_drop" not in testspec.stated_conditions("Meri app khulte hi band ho jati hai")
+    spec = testspec.build_spec(testspec.ModelSpec.model_validate({**json.loads(model_reply(conditions=[], journey="other",
+                               symptom="storage_error")["content"])}), "Storage full hone par photo save nahi hoti", {})
+    assert spec["execution"]["mode"] == "generic" and spec["execution"]["custom_persona"]["free_storage_mb"] == 300

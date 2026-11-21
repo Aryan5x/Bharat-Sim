@@ -2897,7 +2897,7 @@ async def diagnose_run(run_id: str, payload: DiagnoseRunRequest, request: Reques
         enforce_sarvam_budget(request)
         try:
             classified = await asyncio.to_thread(chat_json, testspec.SYSTEM_PROMPT, "Developer request:\n<<<\n" + problem + "\n>>>",
-                                                 testspec.model_json_schema(), "bharatsim_test_spec", 20, 600)
+                                                 testspec.model_json_schema(), "bharatsim_test_spec", 25, 900)
             symptom = testspec.parse_model_output(classified["content"]).symptom
             symptom_source = "sarvam"
         except (SarvamProviderError, SarvamRateLimited, ValueError):
