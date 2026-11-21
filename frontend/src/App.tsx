@@ -10,8 +10,6 @@ import {
   Clock3,
   FileSearch,
   FlaskConical,
-  Gauge,
-  Layers3,
   LoaderCircle,
   RefreshCw,
   ShieldCheck,
@@ -30,7 +28,8 @@ import {
   type Capabilities,
   type Persona,
   type Run,
-  type Worker
+  type Worker,
+  type EvaluatorScenario
 } from "./api";
 
 import PersonaPanel from "./components/PersonaPanel";
@@ -43,17 +42,27 @@ import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
+import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
+import Sidebar from "./components/Sidebar";
+import Topbar from "./components/Topbar";
+import LandingPage from "./components/LandingPage";
+import DashboardOverview from "./components/DashboardOverview";
+import NewTestWizard from "./components/NewTestWizard";
+import { downloadAnalysisPdf } from "./pdfExport";
+import CompareRunsView from "./components/CompareRunsView";
+import SettingsView from "./components/SettingsView";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, uploadApkSigned, type SignedApkUploadTicket } from "./storageUpload";
-import { isDemoMode, readSession } from "./auth";
+import { enterDemoMode, isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
-const API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
+// API_DOCS_URL kept for future use
+const _API_DOCS_URL = API || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
+void _API_DOCS_URL;
 
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const previewMode = isDemoMode();
-
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
   const [customPersona, setCustomPersona] = useState<CustomPersona>(DEFAULT_CUSTOM_PERSONA);
@@ -70,17 +79,27 @@ export default function App() {
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showEvaluatorModal, setShowEvaluatorModal] = useState(false);
+
   // Keep the latest report across refreshes in this tab only. Reports are
   // scoped to the authenticated user and are never sent to another service.
   useEffect(() => {
     if (analysis && !previewMode) saveAnalysisForSession(readSession()?.user?.id, analysis);
   }, [analysis]);
 
-
   const currentTab = location.pathname.startsWith("/runs")
     ? "runs"
     : location.pathname.startsWith("/analysis")
     ? "analysis"
+    : location.pathname.startsWith("/compare")
+    ? "compare"
+    : location.pathname.startsWith("/new-test")
+    ? "new-test"
+    : location.pathname.startsWith("/settings")
+    ? "settings"
+    : location.pathname.startsWith("/landing")
+    ? "landing"
     : "overview";
 
   async function refresh(silent = false) {
@@ -150,8 +169,7 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [hasActiveRun]);
 
-  async function submitApk(e: FormEvent) {
-    e.preventDefault();
+  async function submitApkFile(targetFile: File) {
     if (previewMode) {
       setError("APK registration is available only after signing in. The public preview is limited to personas and risk planning.");
       return;
@@ -163,7 +181,6 @@ export default function App() {
       if (capabilities?.database_persistence !== true || capabilities?.apk_upload !== true) {
         throw new Error("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
       }
-      if (!apk) throw new Error("Choose an APK file first.");
       if (selected === "custom") {
         const problems = customPersonaErrors(customPersona);
         if (problems.length) throw new Error("Fix the custom persona first: " + problems.join("; "));
@@ -172,9 +189,9 @@ export default function App() {
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
         if (!globalThis.crypto?.subtle) throw new Error("Secure file hashing is unavailable in this browser.");
-        const digest = await crypto.subtle.digest("SHA-256", await apk.arrayBuffer());
+        const digest = await crypto.subtle.digest("SHA-256", await targetFile.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
-        let ticket = getPendingApkUpload(sha256, apk);
+        let ticket = getPendingApkUpload(sha256, targetFile);
         if (ticket && !ticket.signed_upload_url) {
           // Tickets from the old resumable flow cannot be completed; start fresh.
           clearPendingApkUpload(sha256);
@@ -195,9 +212,9 @@ export default function App() {
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...personaFields, filename: apk.name, size_bytes: apk.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
           });
-          savePendingApkUpload(sha256, apk, ticket);
+          savePendingApkUpload(sha256, targetFile, ticket);
         } else {
           setNotice("Resuming your interrupted APK upload…");
         }
@@ -205,19 +222,19 @@ export default function App() {
           setNotice("Uploading APK securely… " + percentage + "%");
         };
         try {
-          if (ticket.signed_upload_url) await uploadApkSigned(apk, ticket, uploadProgress);
-          else await uploadApkResumable(apk, sha256, ticket, uploadProgress);
+          if (ticket.signed_upload_url) await uploadApkSigned(targetFile, ticket, uploadProgress);
+          else await uploadApkResumable(targetFile, sha256, ticket, uploadProgress);
         } catch (uploadError) {
           if (!(uploadError instanceof Error) || !uploadError.message.includes("fresh upload ticket")) throw uploadError;
           clearPendingApkUpload(sha256);
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...personaFields, filename: apk.name, size_bytes: apk.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
           });
-          savePendingApkUpload(sha256, apk, ticket);
+          savePendingApkUpload(sha256, targetFile, ticket);
           setNotice("The previous upload expired. Restarting securely with a fresh upload ticket…");
-          await uploadApkResumable(apk, sha256, ticket, uploadProgress);
+          await uploadApkResumable(targetFile, sha256, ticket, uploadProgress);
         }
         setNotice("Upload complete. Verifying the private APK and preparing the test…");
         run = await api<Run & { message: string }>(
@@ -226,13 +243,13 @@ export default function App() {
         );
         clearPendingApkUpload(sha256);
       } else {
-        if (import.meta.env.PROD && apk.size > 4 * 1024 * 1024) {
+        if (import.meta.env.PROD && targetFile.size > 4 * 1024 * 1024) {
           throw new Error("Large APK upload is unavailable until private Supabase Storage is configured. This deployment can accept files up to 4 MB.");
         }
         const body = new FormData();
         body.append("persona_id", personaFields.persona_id);
         if (selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
-        body.append("apk", apk);
+        body.append("apk", targetFile);
         run = await api<Run & { message: string }>("/api/v1/runs", {
           method: "POST",
           body
@@ -241,7 +258,7 @@ export default function App() {
       setNotice(run.message);
       setApk(null);
       await refresh();
-      navigate("/runs");
+      navigate(`/runs/${encodeURIComponent(run.id)}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create run");
     } finally {
@@ -249,7 +266,20 @@ export default function App() {
     }
   }
 
-  async function analyzeLogs(text = logText) {
+  async function submitApk(e: FormEvent) {
+    e.preventDefault();
+    if (!apk) {
+      setError("Choose an APK file first.");
+      return;
+    }
+    await submitApkFile(apk);
+  }
+
+  async function analyzeLogs(text = logText, personaId = selected) {
+    if (previewMode || (!readSession() && import.meta.env.PROD)) {
+      setError("Log analysis is a private workspace feature. Sign in to analyze logs and save or export reports.");
+      return;
+    }
     if (!text.trim()) {
       setError("Paste logcat output first.");
       return;
@@ -264,7 +294,7 @@ export default function App() {
       const a = await api<Analysis>("/api/v1/analyze/logs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, persona_id: selected })
+        body: JSON.stringify({ text, persona_id: personaId })
       });
       setAnalysis(a);
       setNotice(a.persistence?.saved === false
@@ -286,6 +316,12 @@ export default function App() {
     }
   }
 
+  const handleLoadScenario = (scenario: EvaluatorScenario) => {
+    setSelected(scenario.persona_id);
+    setLogText(scenario.logcat);
+    void analyzeLogs(scenario.logcat, scenario.persona_id);
+  };
+
   function exportReport() {
     if (!analysis) return;
     const blob = new Blob([JSON.stringify(analysis, null, 2)], {
@@ -296,203 +332,48 @@ export default function App() {
     a.href = url;
     a.download = "bharatsim-analysis-" + analysis.id.slice(0, 8) + ".json";
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportReportPdf() {
+    if (!analysis) return;
+    downloadAnalysisPdf(analysis);
   }
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <button
-          className="brand"
-          style={{ background: "transparent", border: 0, padding: "0 8px 29px", width: "100%", textAlign: "left" }}
-          onClick={() => navigate("/")}
-        >
-          <span className="brand-mark">
-            <Activity size={22} />
-          </span>
-          <span>
-            <b>BharatSim</b>
-            <small>ANDROID TESTING WORKSPACE</small>
-          </span>
-        </button>
+      <Sidebar
+        currentTab={currentTab}
+        onSelectTab={(tab) => {
+          if (tab === "overview") navigate("/");
+          else navigate(`/${tab}`);
+        }}
+        workers={workers}
+        previewMode={previewMode}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        runsCount={runs.length}
+      />
 
-        <div className="workspace">
-          <span className="workspace-icon">B</span>
-          <span>
-            <b>BharatSim workspace</b>
-            <small>Android resilience testing</small>
-          </span>
-          <ChevronRight size={15} />
-        </div>
-
-        <div className="nav-label">WORKSPACE</div>
-        <nav>
-          <button
-            className={"nav-item " + (currentTab === "overview" ? "active" : "")}
-            onClick={() => navigate("/")}
-          >
-            <Layers3 size={17} /> Overview
-          </button>
-          <button
-            className={"nav-item " + (currentTab === "runs" ? "active" : "")}
-            onClick={() => navigate("/runs")}
-          >
-            <FlaskConical size={17} /> Test runs{" "}
-            <span className="nav-count">{previewMode ? "LOCKED" : runs.length}</span>
-          </button>
-          <button
-            className={"nav-item " + (currentTab === "analysis" ? "active" : "")}
-            onClick={() => navigate("/analysis")}
-          >
-            <FileSearch size={17} /> Log analysis
-          </button>
-        </nav>
-
-        <div className="sidebar-bottom">
-          <div className="worker-card">
-            <span
-              className={
-                "pulse-dot " +
-                (workers.some((w) => w.online) ? "worker-online" : "")
-              }
-            />
-            <div>
-              <b>Execution worker</b>
-              <small>
-                {previewMode
-                  ? "Private operational status"
-                  : workers.some((w) => w.online)
-                    ? workers.filter((w) => w.online).length +
-                      " heartbeat(s) · " +
-                      (workers.some((w) => w.status === "running") ? "running" : "idle")
-                    : "No recent heartbeat"}
-              </small>
-            </div>
-            <span className="status-pill">
-              {previewMode ? "LOCKED" : workers.some((w) => w.online) ? "ONLINE" : "OFFLINE"}
-            </span>
-          </div>
-          <p>
-            {previewMode
-              ? "Worker heartbeats and private run details require a signed-in account."
-              : workers.some((w) => w.online)
-                ? "A worker heartbeat was received recently. Run status still depends on its actual report."
-                : "APK execution waits until an authenticated, isolated Android worker connects."}
-          </p>
-          <a
-            href={API_DOCS_URL + "/docs"}
-            target="_blank"
-            rel="noreferrer"
-          >
-            API documentation <ArrowUpRight size={13} />
-          </a>
-        </div>
-      </aside>
-
-      <main className="main">
-        <header className="topbar">
-          <div className="breadcrumbs">
-            Workspace <ChevronRight size={14} />
-            {location.pathname.startsWith("/runs/") ? (
-              <>
-                <button
-                  className="text-button"
-                  style={{ padding: 0, color: "inherit" }}
-                  onClick={() => navigate("/runs")}
-                >
-                  Test runs
-                </button>
-                <ChevronRight size={14} /> <b>Run evidence</b>
-              </>
-            ) : (
-              <b>
-                {currentTab === "overview"
-                  ? "Overview"
-                  : currentTab === "runs"
-                  ? "Test runs"
-                  : "Log analysis"}
-              </b>
-            )}
-          </div>
-          <div className="top-actions">
-            <span className={"api-state " + apiStatus}>
-              <span /> API{" "}
-              {apiStatus === "online"
-                ? "connected"
-                : apiStatus === "offline"
-                ? "unavailable"
-                : "checking"}
-            </span>
-            <button
-              className="icon-button"
-              onClick={() => void refresh()}
-              aria-label="Refresh data"
-              disabled={loading}
-            >
-              <RefreshCw size={16} className={loading ? "spin" : ""} />
-            </button>
-            <div className="avatar">BS</div>
-          </div>
-        </header>
+      <main className={"main " + (sidebarCollapsed ? "sidebar-collapsed" : "")}>
+        <Topbar
+          currentTab={currentTab}
+          runId={location.pathname.startsWith("/runs/") ? location.pathname.split("/runs/")[1] : undefined}
+          apiStatus={apiStatus}
+          loading={loading}
+          onRefresh={() => void refresh()}
+          onOpenEvaluatorTour={() => setShowEvaluatorModal(true)}
+          onNavigateTab={(tab) => {
+            if (tab === "overview") navigate("/");
+            else navigate(`/${tab}`);
+          }}
+        />
 
         <div className="content">
           <div className="eyebrow">
             <span className="eyebrow-line" /> ANDROID RESILIENCE INTELLIGENCE{" "}
             <span className="flag">भारत</span>
           </div>
-
-          <section className="hero">
-            <div>
-              <h1>
-                Test Android apps
-                <br />
-                under <em>real-world constraints.</em>
-              </h1>
-              <p>
-                Configure a test profile, register an APK run, and review the execution evidence. Inspect submitted logcat, compare measured network conditions, and see exactly which device controls were applied, verified, or are not yet supported.
-              </p>
-              <div className="hero-actions">
-                <button
-                  className="primary-button"
-                  onClick={() => {
-                    navigate("/");
-                    window.setTimeout(
-                      () =>
-                        document
-                          .getElementById(previewMode ? "risk-planner" : "new-run")
-                          ?.scrollIntoView({ behavior: "smooth", block: "center" }),
-                      50
-                    );
-                  }}
-                >
-                  <FlaskConical size={16} /> {previewMode ? "Explore risk planner" : "Configure a test"} <ArrowUpRight size={15} />
-                </button>
-              </div>
-            </div>
-
-            <div className="hero-visual">
-              <section className="workspace-status-card" aria-label="Live workspace readiness">
-                <div className="workspace-status-heading">
-                  <span className="workspace-status-kicker">LIVE WORKSPACE</span>
-                  <span className={"workspace-status-pill " + apiStatus}>
-                    <i /> {apiStatus === "online" ? "Connected" : apiStatus === "offline" ? "Unavailable" : "Checking"}
-                  </span>
-                </div>
-                <h2>Run readiness</h2>
-                <p>Current service and worker state, reported by the connected API.</p>
-                <div className="workspace-status-grid">
-                  <div><small>API</small><b>{apiStatus === "online" ? "Connected" : apiStatus === "offline" ? "Unavailable" : "Checking"}</b></div>
-                  <div><small>Execution workers</small><b>{previewMode ? "Private" : workers.filter((worker) => worker.online).length + " online"}</b></div>
-                  <div><small>APK upload</small><b>{previewMode ? "Sign-in required" : capabilities ? (capabilities.apk_upload ? "Available" : "Unavailable") : "Checking"}</b></div>
-                  <div><small>APK execution</small><b>{capabilities ? (capabilities.android_execution ? "Enabled" : "Disabled") : "Checking"}</b></div>
-                </div>
-                <div className="workspace-status-foot">
-                  <ShieldCheck size={16} />
-                  <span>{capabilities?.notes?.[0] || "Capabilities appear here after the API responds. No sample execution metrics are shown."}</span>
-                </div>
-              </section>
-            </div>
-          </section>
 
           {error && (
             <div className="alert error-alert" role="alert">
@@ -514,260 +395,279 @@ export default function App() {
             </div>
           )}
 
-          <section className="metric-grid">
-            <div className="metric-card">
-              <div className="metric-heading">
-                TEST PROFILES <Smartphone size={17} />
-              </div>
-              <div className="metric-value">
-                {personas.length}
-                <span className="metric-unit"> profiles</span>
-              </div>
-              <div className="metric-foot">
-                <span className="mini-bars">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>{" "}
-                {apiStatus === "online"
-                  ? "Profiles loaded from connected API"
-                  : apiStatus === "offline"
-                  ? "Local reference templates · not live device data"
-                  : "Waiting for API profile data"}
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-heading">
-                TEST RUNS <FlaskConical size={17} />
-              </div>
-              <div className="metric-value">
-                {previewMode ? "Private" : runs.length}
-                <span className="metric-unit">{previewMode ? " history" : " recorded"}</span>
-              </div>
-              <div className="metric-foot">
-                <span className="metric-neutral" /> {previewMode ? "Sign in to view private test runs" : "No synthetic execution results"}
-              </div>
-            </div>
-
-            <div className="metric-card">
-              <div className="metric-heading">
-                LOG FINDINGS <FileSearch size={17} />
-              </div>
-              <div className="metric-value">
-                {analysis ? analysis.summary.finding_count : "—"}
-                <span className="metric-unit">
-                  {analysis ? " detected" : " run analysis"}
-                </span>
-              </div>
-              <div className="metric-foot">
-                <span className="metric-neutral" />{" "}
-                {analysis
-                  ? analysis.summary.critical + " critical signals"
-                  : "Evidence-first diagnostics"}
-              </div>
-            </div>
-
-            <div className="metric-card score-card">
-              <div className="metric-heading">
-                BHARATSCORE <Gauge size={17} />
-              </div>
-              <div className="metric-value">
-                {analysis ? analysis.bharat_score.value : "—"}
-                <span className="metric-unit"> / 100</span>
-              </div>
-              <div className="metric-foot">
-                <span className="score-dot" />{" "}
-                {analysis ? "Log heuristic score" : "Calculated from evidence"}
-              </div>
-            </div>
-          </section>
-
           <Routes>
             {/* Overview route */}
             <Route
               path="/"
               element={
-                <div className="dashboard-grid">
-                  <PersonaPanel
+                <div className="overview-page-wrapper">
+                  <DashboardOverview
                     personas={personas}
-                    selected={selected}
-                    setSelected={setSelected}
-                    apiStatus={apiStatus}
-                    loading={loading}
-                  />
-
-                  <UploadPanel
-                    apk={apk}
-                    setApk={setApk}
-                    selected={selected}
-                    setSelected={setSelected}
-                    customPersona={customPersona}
-                    setCustomPersona={setCustomPersona}
-                    personas={personas}
+                    runs={runs}
                     workers={workers}
-                    busy={busy}
+                    analysis={analysis}
+                    capabilities={capabilities}
                     apiStatus={apiStatus}
-                    directUploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.direct_apk_upload === true}
-                    uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
-                    lockedReason={previewMode
-                      ? "Public preview is read-only for private APK operations. Sign in to register APK runs."
-                      : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
-                    onSubmit={submitApk}
+                    previewMode={previewMode}
+                    onNavigateTab={(tab) => {
+                      if (tab === "overview") navigate("/");
+                      else navigate(`/${tab}`);
+                    }}
+                    onNavigateRun={(id) => navigate(`/runs/${encodeURIComponent(id)}`)}
+                    onLoadScenario={handleLoadScenario}
                   />
 
-                  <PlannerPanel selected={selected} />
-
-                  <section className="panel log-panel">
-                    <div className="panel-heading">
-                      <div>
-                        <div className="section-kicker">03 / EVIDENCE ANALYSIS</div>
-                        <h2>Inspect logcat</h2>
-                        <p>Detect crash, ANR, memory, network and storage signals.</p>
-                      </div>
-                      <div className="panel-icon">
-                        <FileSearch size={19} />
-                      </div>
-                    </div>
-                    {previewMode && (
-                      <div className="alert preview-info" role="status">
-                        <ShieldCheck size={16} />
-                        <span>Public preview: explore live personas and the risk planner. Log analysis and report export require a signed-in account.</span>
-                      </div>
-                    )}
-                    <textarea
-                      disabled={previewMode}
-                      value={logText}
-                      onChange={(e) => setLogText(e.target.value)}
-                      placeholder="Paste Android logcat output here…"
-                      rows={5}
+                  <div className="dashboard-grid" style={{ marginTop: 24 }}>
+                    <PersonaPanel
+                      personas={personas}
+                      selected={selected}
+                      setSelected={setSelected}
+                      apiStatus={apiStatus}
+                      loading={loading}
                     />
-                    {apiStatus === "online" && capabilities?.analysis_persistence !== true && (
-                      <div className="alert error-alert" role="status">
-                        <CircleAlert size={16} />
-                        <span>Logcat analysis is available, but reports remain in this browser session until persistent PostgreSQL is configured.</span>
-                      </div>
-                    )}
-                    {analysisBusy && (
-                      <div className="analysis-progress" role="status" aria-live="polite">
-                        <LoaderCircle className="analysis-progress-icon spin" size={19} />
-                        <div className="analysis-progress-copy">
-                          <b>Analyzing submitted logcat</b>
-                          <span>Extracting source-line evidence, grouping repeated failure signals, and preparing your report.</span>
-                        </div>
-                        <div className="analysis-progress-track" aria-hidden="true"><i /></div>
-                      </div>
-                    )}
-                    <div className="log-actions">
-                      <button
-                        className="primary-button"
-                        disabled={previewMode || busy || apiStatus !== "online" || capabilities?.log_analysis !== true}
-                        onClick={() => void analyzeLogs()}
-                      >
-                        {analysisBusy ? (
-                          <LoaderCircle className="spin" size={15} />
-                        ) : (
-                          <Activity size={15} />
-                        )}
-                        {" "}
-                        {analysisBusy ? "Analyzing evidence…" : "Analyze evidence"}
-                      </button>
-                    </div>
-                    <div className="evidence-note">
-                      <ShieldCheck size={15} /> Sample data is illustrative, not device
-                      evidence · Deterministic detection · Source-line references
-                    </div>
-                  </section>
 
-                  <section className="panel recent-panel">
-                    <div className="panel-heading">
-                      <div>
-                        <div className="section-kicker">04 / ACTIVITY</div>
-                        <h2>Recent test runs</h2>
-                        <p>Run status from the connected API.</p>
-                      </div>
-                      <button
-                        className="text-button"
-                        onClick={() => navigate("/runs")}
-                      >
-                        View all <ArrowUpRight size={13} />
-                      </button>
-                    </div>
-                    {loading && runs.length === 0 ? (
-                      <div className="empty-state">
-                        <LoaderCircle className="spin" size={24} />
-                        <b>Loading test runs…</b>
-                        <p>Fetching recent runs from the API.</p>
-                      </div>
-                    ) : apiStatus === "offline" ? (
-                      <div className="alert error-alert" role="alert">
-                        <CircleAlert size={16} />
-                        <span>API is down or unreachable. Unable to load recent runs.</span>
-                      </div>
-                    ) : previewMode ? (
-                      <div className="empty-state">
-                        <div className="empty-icon"><ShieldCheck size={22} /></div>
-                        <b>Private run history</b>
-                        <p>Sign in to view your saved test runs and worker evidence.</p>
-                      </div>
-                    ) : capabilities?.database_persistence !== true ? (
-                      <div className="empty-state">
-                        <div className="empty-icon">
-                          <Clock3 size={22} />
+                    <UploadPanel
+                      apk={apk}
+                      setApk={setApk}
+                      selected={selected}
+                      setSelected={setSelected}
+                      personas={personas}
+                      workers={workers}
+                      busy={busy}
+                      apiStatus={apiStatus}
+                      directUploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.direct_apk_upload === true}
+                      uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
+                      lockedReason={previewMode
+                        ? "Public preview is read-only for private APK operations. Sign in to register APK runs."
+                        : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
+                      onSubmit={submitApk}
+                    />
+
+                    <PlannerPanel selected={selected} />
+
+                    <section className="panel log-panel">
+                      <div className="panel-heading">
+                        <div>
+                          <div className="section-kicker">03 / EVIDENCE ANALYSIS</div>
+                          <h2>Inspect logcat</h2>
+                          <p>Detect crash, ANR, memory, network and storage signals.</p>
                         </div>
-                        <b>Run history unavailable</b>
-                        <p>Persistent PostgreSQL is not configured for this deployment. No saved run history is being reported.</p>
-                      </div>
-                    ) : runs.length === 0 ? (
-                      <div className="empty-state">
-                        <div className="empty-icon">
-                          <Clock3 size={22} />
+                        <div className="panel-icon">
+                          <FileSearch size={19} />
                         </div>
-                        <b>No test runs yet</b>
-                        <p>
-                          Your registered APKs and worker-reported execution results will appear here.
-                        </p>
                       </div>
-                    ) : (
-                      <div className="recent-list">
-                        {runs.slice(0, 4).map((r) => (
-                          <button
-                            key={r.id}
-                            className="recent-row"
-                            onClick={() => navigate(`/runs/${encodeURIComponent(r.id)}`)}
-                          >
-                            <span className="recent-file">
-                              <Smartphone size={17} />
-                            </span>
-                            <span className="recent-info">
-                              <b>{r.apk_name || "Log / test session"}</b>
-                              <small>
-                                {date(r.created_at)} · {r.id.slice(0, 8)}
-                              </small>
-                            </span>
-                            <span
-                              className={
-                                "run-status " +
-                                (r.status === "completed"
-                                  ? "done"
-                                  : r.status === "failed"
-                                  ? "failed"
-                                  : "pending")
-                              }
+                      {previewMode && (
+                        <div className="alert preview-info" role="status">
+                          <ShieldCheck size={16} />
+                          <span>Public preview: explore live personas and the risk planner. Log analysis and report export require a signed-in account.</span>
+                        </div>
+                      )}
+                      <textarea
+                        disabled={previewMode}
+                        value={logText}
+                        onChange={(e) => setLogText(e.target.value)}
+                        placeholder="Paste Android logcat output here…"
+                        rows={5}
+                      />
+                      {apiStatus === "online" && capabilities?.analysis_persistence !== true && (
+                        <div className="alert error-alert" role="status">
+                          <CircleAlert size={16} />
+                          <span>Logcat analysis is available, but reports remain in this browser session until persistent PostgreSQL is configured.</span>
+                        </div>
+                      )}
+                      {analysisBusy && (
+                        <div className="analysis-progress" role="status" aria-live="polite">
+                          <LoaderCircle className="analysis-progress-icon spin" size={19} />
+                          <div className="analysis-progress-copy">
+                            <b>Analyzing submitted logcat</b>
+                            <span>Extracting source-line evidence, grouping repeated failure signals, and preparing your report.</span>
+                          </div>
+                          <div className="analysis-progress-track" aria-hidden="true"><i /></div>
+                        </div>
+                      )}
+                      <div className="log-actions">
+                        <button
+                          className="primary-button"
+                          disabled={previewMode || busy || apiStatus !== "online" || capabilities?.log_analysis !== true}
+                          onClick={() => void analyzeLogs()}
+                        >
+                          {analysisBusy ? (
+                            <LoaderCircle className="spin" size={15} />
+                          ) : (
+                            <Activity size={15} />
+                          )}
+                          {" "}
+                          {analysisBusy ? "Analyzing evidence…" : "Analyze evidence"}
+                        </button>
+                      </div>
+                      <div className="evidence-note">
+                        <ShieldCheck size={15} /> Sample data is illustrative, not device
+                        evidence · Deterministic detection · Source-line references
+                      </div>
+                    </section>
+
+                    <section className="panel recent-panel">
+                      <div className="panel-heading">
+                        <div>
+                          <div className="section-kicker">04 / ACTIVITY</div>
+                          <h2>Recent test runs</h2>
+                          <p>Run status from the connected API.</p>
+                        </div>
+                        <button
+                          className="text-button"
+                          onClick={() => navigate("/runs")}
+                        >
+                          View all <ArrowUpRight size={13} />
+                        </button>
+                      </div>
+                      {loading && runs.length === 0 ? (
+                        <div className="empty-state">
+                          <LoaderCircle className="spin" size={24} />
+                          <b>Loading test runs…</b>
+                          <p>Fetching recent runs from the API.</p>
+                        </div>
+                      ) : apiStatus === "offline" ? (
+                        <div className="alert error-alert" role="alert">
+                          <CircleAlert size={16} />
+                          <span>API is down or unreachable. Unable to load recent runs.</span>
+                        </div>
+                      ) : previewMode ? (
+                        <div className="empty-state">
+                          <div className="empty-icon"><ShieldCheck size={22} /></div>
+                          <b>Private run history</b>
+                          <p>Sign in to view your saved test runs and worker evidence.</p>
+                        </div>
+                      ) : capabilities?.database_persistence !== true ? (
+                        <div className="empty-state">
+                          <div className="empty-icon">
+                            <Clock3 size={22} />
+                          </div>
+                          <b>Run history unavailable</b>
+                          <p>Persistent PostgreSQL is not configured for this deployment. No saved run history is being reported.</p>
+                        </div>
+                      ) : runs.length === 0 ? (
+                        <div className="empty-state">
+                          <div className="empty-icon">
+                            <Clock3 size={22} />
+                          </div>
+                          <b>No test runs yet</b>
+                          <p>
+                            Your registered APKs and worker-reported execution results will appear here.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="recent-list">
+                          {runs.slice(0, 4).map((r) => (
+                            <button
+                              key={r.id}
+                              className="recent-row"
+                              onClick={() => navigate(`/runs/${encodeURIComponent(r.id)}`)}
                             >
-                              {displayRunStatus(r.status)}
-                            </span>
-                            <ChevronRight size={15} />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                              <span className="recent-file">
+                                <Smartphone size={17} />
+                              </span>
+                              <span className="recent-info">
+                                <b>{r.apk_name || "Log / test session"}</b>
+                                <small>
+                                  {date(r.created_at)} · {r.id.slice(0, 8)}
+                                </small>
+                              </span>
+                              <span
+                                className={
+                                  "run-status " +
+                                  (r.status === "completed"
+                                    ? "done"
+                                    : r.status === "failed"
+                                    ? "failed"
+                                    : "pending")
+                                }
+                              >
+                                {displayRunStatus(r.status)}
+                              </span>
+                              <ChevronRight size={15} />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </section>
 
-                  <CapabilityPanel capabilities={capabilities} loading={loading} />
+                    <CapabilityPanel capabilities={capabilities} loading={loading} />
+                  </div>
                 </div>
               }
+            />
+
+            {/* Platform Showcase Landing route */}
+            <Route
+              path="/landing"
+              element={
+                <LandingPage
+                  onStartTesting={() => navigate("/new-test")}
+                  onExplorePlanner={() => {
+                    enterDemoMode();
+                    navigate("/");
+                    window.setTimeout(() => {
+                      document.getElementById("risk-planner")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 100);
+                  }}
+                  onLoadScenario={handleLoadScenario}
+                />
+              }
+            />
+
+            {/* Step-by-Step Test Setup Wizard route */}
+            <Route
+              path="/new-test"
+              element={
+                <NewTestWizard
+                  personas={personas}
+                  selectedPersona={selected}
+                  onSelectPersona={setSelected}
+                  busy={busy}
+                  uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
+                  maxUploadMb={capabilities?.max_upload_mb ?? 150}
+                  lockedReason={previewMode
+                    ? "Sign in to register and execute private APK runs."
+                    : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
+                  onSubmit={submitApkFile}
+                  onCancel={() => navigate("/")}
+                  customPersona={customPersona}
+                  onCustomPersonaChange={setCustomPersona}
+                />
+              }
+            />
+
+            {/* Comparative Telemetry & Anomaly Analysis route */}
+            <Route
+              path="/compare"
+              element={
+                previewMode ? (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <ShieldCheck size={26} />
+                      <b>Private run comparison</b>
+                      <p>Sign in to compare owner-scoped completed runs.</p>
+                    </div>
+                  </section>
+                ) : capabilities?.run_comparison === true ? (
+                  <CompareRunsView runs={runs} onBack={() => navigate("/")} />
+                ) : (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <CircleAlert size={26} />
+                      <b>Run comparison unavailable</b>
+                      <p>Persistent PostgreSQL is not configured for this deployment. Comparison is disabled rather than generating sample metrics.</p>
+                      <button type="button" className="secondary-button" onClick={() => navigate("/")}>Back to overview</button>
+                    </div>
+                  </section>
+                )
+              }
+            />
+
+            {/* Settings route */}
+            <Route
+              path="/settings"
+              element={<SettingsView capabilities={capabilities} apiStatus={apiStatus} />}
             />
 
             {/* Test runs list route */}
@@ -857,9 +757,14 @@ export default function App() {
                       <p>Findings are heuristic signals, not confirmed root causes.</p>
                     </div>
                     {analysis && (
-                      <button className="secondary-button" onClick={exportReport}>
-                        <ArrowDownToLine size={15} /> Export JSON
-                      </button>
+                      <div className="report-export-actions">
+                        <button className="secondary-button" onClick={exportReportPdf}>
+                          <ArrowDownToLine size={15} /> Export PDF
+                        </button>
+                        <button className="secondary-button" onClick={exportReport}>
+                          <ArrowDownToLine size={15} /> Export JSON
+                        </button>
+                      </div>
                     )}
                   </div>
 
@@ -993,6 +898,35 @@ export default function App() {
           </footer>
         </div>
       </main>
+
+      {showEvaluatorModal && (
+        <div className="modal-backdrop" onClick={() => setShowEvaluatorModal(false)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 840 }}>
+            <div className="modal-header">
+              <div>
+                <span className="section-kicker">EVALUATOR QUICK TOUR</span>
+                <h2>Preloaded Live Demonstration Scenarios</h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() => setShowEvaluatorModal(false)}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ padding: 16 }}>
+              <EvaluatorTourBanner
+                onLoadScenario={(sc) => {
+                  setShowEvaluatorModal(false);
+                  handleLoadScenario(sc);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

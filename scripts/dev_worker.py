@@ -23,6 +23,7 @@ if os.environ["BHARATSIM_API_URL"].startswith("http://127.0.0.1") or os.environ[
 os.environ.setdefault("ANDROID_SERIAL", "emulator-5554")
 os.environ.setdefault("BHARATSIM_ENABLE_LOCAL_APK_EXECUTION", "true")
 os.environ.setdefault("BHARATSIM_WORKER_ID", "deccans-laptop-1")
+os.environ.setdefault("BHARATSIM_WORKER_ENGINE", "engine")
 sys.path.insert(0, str(ROOT))
 
 from worker.agent import main  # noqa: E402

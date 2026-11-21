@@ -23,6 +23,7 @@ class AgentEntrypointTests(unittest.TestCase):
             text=True,
             timeout=10,
             check=False,
+            stdin=subprocess.DEVNULL,
         )
         self.assertEqual(completed.returncode, 2)
         self.assertIn("BHARATSIM_API_URL", completed.stderr)

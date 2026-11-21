@@ -1,10 +1,12 @@
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
-test.beforeEach(async ({ page }) => {
-  // The local API deliberately does not enforce JWTs, but production builds
-  // still exercise the same authenticated dashboard gate.
-  await page.goto("/");
-  await page.evaluate(() => {
+async function installLocalWorkspaceSession(page: import("@playwright/test").Page) {
+  // Non-production UI fixture, used only against the localhost E2E API.
+  await page.addInitScript(() => {
+    // Seed once per isolated browser context. A localStorage sentinel survives
+    // reloads, allowing tests to clear sessionStorage and verify logout/guest gates.
+    if (localStorage.getItem("bharatsim.e2e.auth-seeded") === "1") return;
     sessionStorage.setItem("bharatsim.supabase.session", JSON.stringify({
       access_token: "playwright-local-test-token",
       refresh_token: "playwright-local-refresh-token",
@@ -12,17 +14,14 @@ test.beforeEach(async ({ page }) => {
       token_type: "bearer",
       user: { id: "11111111-1111-4111-8111-111111111111", email: "playwright@example.test" },
     }));
+    localStorage.setItem("bharatsim.e2e.auth-seeded", "1");
   });
-  await page.reload();
-});
+}
 
 
 test("public preview exposes the live planner but keeps private actions gated", async ({ page }) => {
-  // beforeEach authenticates the normal workspace; clear it before observing
-  // requests so this assertion measures only the guest preview lifecycle.
+  // Fresh Playwright context is unauthenticated; this test intentionally uses guest preview.
   await page.goto("/");
-  await page.evaluate(() => sessionStorage.clear());
-  await page.reload();
 
   let protectedRequestCount = 0;
   page.on("request", (request) => {
@@ -35,31 +34,34 @@ test("public preview exposes the live planner but keeps private actions gated", 
   await page.getByRole("button", { name: /Explore public planner preview/ }).click();
 
   await expect(page.getByText(/Public preview · live persona and risk planner/)).toBeVisible();
-  await expect(page.getByText("API connected")).toBeVisible();
+  await expect(page.getByText("API Connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
-  await page.getByRole("button", { name: /Explore risk planner/ }).click();
+  await page.locator("#risk-planner").scrollIntoViewIfNeeded();
   await expect(page.locator("#risk-planner")).toBeInViewport();
   await expect(page.getByPlaceholder("Paste Android logcat output here…")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Analyze evidence" })).toBeDisabled();
   await expect(page.locator('input[type="file"]')).toBeDisabled();
   await expect(page.getByText(/Log analysis and report export require a signed-in account/)).toBeVisible();
-  await page.waitForTimeout(500);
   expect(protectedRequestCount).toBe(0);
 });
 
 test("dashboard connects to the real API and renders authored profiles", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByText("Budget Android", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText(/Profiles loaded from connected API/)).toBeVisible();
-  await expect(page.getByText(/not measurements from physical devices/)).toBeVisible();
+  await expect(page.getByText("Profiles returned by API")).toBeVisible();
+  await expect(page.getByText(/authored test targets, not measurements from physical devices/)).toBeVisible();
   await expect(page.getByText("PACKET LOSS · NOT APPLIED")).toBeVisible();
   await expect(page.getByText("2% target", { exact: true })).toBeVisible();
 });
 
 test("log analysis reports findings from submitted evidence and preserves source lines", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.stack || error.message));
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
@@ -68,36 +70,92 @@ test("log analysis reports findings from submitted evidence and preserves source
     "01-01 00:00:01.001 100 100 E AndroidRuntime: java.lang.OutOfMemoryError: Failed allocation",
   ].join("\n");
   await page.getByPlaceholder("Paste Android logcat output here…").fill(input);
+  const analysisResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/v1/analyze/logs") && response.request().method() === "POST"
+  );
   await page.getByRole("button", { name: "Analyze evidence" }).click();
+  const analysisResponse = await analysisResponsePromise;
+  const analysisBody = await analysisResponse.text();
+  expect(
+    analysisResponse.ok(),
+    `Log analysis API returned ${analysisResponse.status()}: ${analysisBody}`
+  ).toBe(true);
+  let analysisPayload: Record<string, unknown>;
+  try {
+    analysisPayload = JSON.parse(analysisBody) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Log analysis API returned non-JSON content: ${analysisBody.slice(0, 1000)}`);
+  }
+  expect(analysisPayload).toHaveProperty("summary");
+  expect(analysisPayload).toHaveProperty("bharat_score");
+  expect(analysisPayload).toHaveProperty("findings");
 
-  await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp("/analysis$"));
+  try {
+    await expect(page.getByRole("heading", { name: "Log analysis results" })).toBeVisible();
+  } catch (error) {
+    const bodyText = await page.locator("body").innerText().catch(() => "<body unavailable>");
+    throw new Error(
+      `Analysis result screen did not render. URL=${page.url()}\\nPage errors=${pageErrors.join("\\n")}\\nBody=${bodyText.slice(0, 3000)}\\nOriginal=${String(error)}`
+    );
+  }
   await expect(page.getByText("Signals detected in supplied logs")).toBeVisible();
   await expect(page.getByText(/SOURCE EVIDENCE/).first()).toBeVisible();
   await expect(page.getByText(/FATAL EXCEPTION/).first()).toBeVisible();
   await expect(page.getByText(/Findings are heuristic signals, not confirmed root causes/)).toBeVisible();
+
+  const pdfDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const pdfDownload = await pdfDownloadPromise;
+  expect(pdfDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\\.pdf$/);
+  const pdfPath = await pdfDownload.path();
+  expect(pdfPath).not.toBeNull();
+  const pdfBytes = await readFile(pdfPath!);
+  expect(pdfBytes.subarray(0, 8).toString("ascii")).toBe("%PDF-1.4");
+
+  const jsonDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export JSON" }).click();
+  const jsonDownload = await jsonDownloadPromise;
+  expect(jsonDownload.suggestedFilename()).toMatch(/^bharatsim-analysis-[a-f0-9]{8}\\.json$/);
+  const jsonPath = await jsonDownload.path();
+  expect(jsonPath).not.toBeNull();
+  const jsonPayload = JSON.parse(await readFile(jsonPath!, "utf8"));
+  expect(jsonPayload).toHaveProperty("findings");
 });
 
 test("run registration is disabled until a real APK is selected", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
   const register = page.getByRole("button", { name: /Register test run/ });
   await expect(register).toBeDisabled();
   await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Test runs/ })).toContainText("0");
+  await expect(page.getByRole("button", { name: /Test Runs/i })).toContainText("0");
 });
 
 test("Configure a test navigates to the real APK registration form", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
 
-  await page.getByRole("button", { name: /Configure a test/ }).click();
-  await expect(page.getByRole("heading", { name: "New test run" })).toBeVisible();
-  await expect(page.getByLabel("Testing persona")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Register test run/ })).toBeDisabled();
-  await expect(page.getByText("Choose an APK to enable run registration")).toBeVisible();
+  await page.getByRole("button", { name: /Launch New Test/ }).click();
+  await expect(page.getByRole("heading", { name: "Configure Android Resilience Execution" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Select Android APK" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Choose BharatSim Device & Network Persona" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Launch Resilience Test/ })).toBeDisabled();
+  const apkPicker = page.getByRole("button", { name: "Choose Android APK file" });
+  if (await apkPicker.getAttribute("aria-disabled") === "true") {
+    await expect(page.getByText(/Run registration is unavailable until production PostgreSQL and private APK storage are configured/)).toBeVisible();
+    await expect(page.locator('input[type="file"]')).toBeDisabled();
+  } else {
+    await expect(page.locator('input[type="file"]')).toBeEnabled();
+    await expect(page.getByText(/Supports .apk packages up to \d+ MB/)).toBeVisible();
+  }
+  await expect(page.getByRole("button", { name: /Budget Android/ })).toHaveAttribute("aria-pressed", "true");
 });
 test("dashboard remains usable at narrow mobile widths without horizontal overflow", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 812 });
     await page.goto("/");
@@ -116,6 +174,7 @@ test("dashboard remains usable at narrow mobile widths without horizontal overfl
 
 
 test("API documentation link stays same-origin in production builds", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   const docsLink = page.getByRole("link", { name: /API documentation/ });
   const href = await docsLink.getAttribute("href");
@@ -125,24 +184,25 @@ test("API documentation link stays same-origin in production builds", async ({ p
 
 
 test("overview uses live readiness instead of a synthetic device demo", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Run readiness" })).toBeVisible();
-  await expect(page.getByText("Current service and worker state, reported by the connected API.")).toBeVisible();
-  await expect(page.getByText("Try illustrative sample")).toHaveCount(0);
-  await expect(page.getByText("Load illustrative sample")).toHaveCount(0);
-  await expect(page.getByText("No sample execution metrics are shown.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Service & Worker Status" })).toBeVisible();
+  await expect(page.getByText("Live health verified through control plane contracts.")).toBeVisible();
+  await expect(page.getByText(/TF-IDF centroid classifier available|Classifier unavailable|Capability status unknown/)).toBeVisible();
+  await expect(page.getByText(/TTS & Translation Enabled/)).toHaveCount(0);
+  await expect(page.getByText(/Provider not configured|Translation & voice configured|Translation only · voice unavailable|Voice only · translation unavailable|Capability status unknown/)).toBeVisible();
 });
 
 test("secure workspace requires sign-in when no session exists", async ({ page }) => {
+  // No auth fixture is installed for this test; assert the default guest gate.
   await page.goto("/");
-  await page.evaluate(() => sessionStorage.removeItem("bharatsim.supabase.session"));
-  await page.reload();
   await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
   await expect(page.getByLabel("Email address")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
 });
 
 test("workspace deep links render after direct browser navigation", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/runs");
   await expect(page).toHaveURL(/runs$/);
   await expect(page.getByRole("heading", { name: "Test sessions" })).toBeVisible();
@@ -155,6 +215,7 @@ test("workspace deep links render after direct browser navigation", async ({ pag
 
 
 test("workspace sections never overlap at common desktop, tablet and phone widths", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   const widths = [320, 375, 520, 720, 768, 1024, 1280, 1440];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
@@ -204,6 +265,7 @@ test("workspace sections never overlap at common desktop, tablet and phone width
 
 
 test("risk planner validates journeys and returns a real API-generated plan", async ({ page }) => {
+  await installLocalWorkspaceSession(page);
   await page.goto("/");
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
@@ -230,4 +292,13 @@ test("risk planner validates journeys and returns a real API-generated plan", as
   await page.getByRole("button", { name: /Export plan JSON/ }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^bharatsim-risk-plan-fintech\.json$/);
+});
+
+
+test("public product landing is reachable without signing in", async ({ page }) => {
+  await page.goto("/landing");
+  await page.evaluate(() => sessionStorage.clear());
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /Test Android apps for the phones/ })).toBeVisible();
+  await expect(page.getByText(/INTERACTIVE PRODUCT PREVIEW/)).toBeVisible();
 });

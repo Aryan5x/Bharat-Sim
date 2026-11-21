@@ -25,6 +25,26 @@
     {
       "source": "/analyses/:path*",
       "destination": "/"
+    },
+    {
+      "source": "/landing",
+      "destination": "/"
+    },
+    {
+      "source": "/new-test",
+      "destination": "/"
+    },
+    {
+      "source": "/compare",
+      "destination": "/"
+    },
+    {
+      "source": "/compare/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/settings",
+      "destination": "/"
     }
   ]
 }

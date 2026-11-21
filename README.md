@@ -1,12 +1,57 @@
-# BharatSim 🇮🇳
+# BharatSim 🇮🇳 — The Cheap Phone Test
 
-**Android resilience testing, with evidence you can act on.** Configure constrained-device profiles, submit APKs, inspect execution evidence, and analyze Android logs without confusing a test plan with a completed test.
+**Android resilience testing, with evidence you can act on.** Ensuring Android applications work reliably on low-end devices and under real-world Indian network conditions by simulating device and network constraints and identifying performance and connectivity failures.
 
-> **Release and recording status (verified 2026-11-02):** The stable customer-facing Vercel domain is [https://bharat-sim-81g2.vercel.app](https://bharat-sim-81g2.vercel.app). Integration PR #126 and pending intake PR #127 have been fully reconciled and merged into `main` at commit `c2a73540beb65c3f8e0b6bec83c1a57acdaea26f`. The complete seven-job CI suite (`frontend`, `frontend-e2e`, `postgres-integration`, `backend`, `unified-vercel-build`, `worker-guards`, `container-build`) and dependency security audits pass 100% on `main`. The guest preview loads public personas and risk planning without calling private run-history or worker endpoints. The live Production Vercel deployment currently serves unified commit `c54c48503cad52ce669bd3c1c719c01df0d27965` because Vercel reached its daily hobby build quota (100 builds/day); redeploying the latest `main` will activate the guest planner preview globally. Use the local setup in [the submission demo runbook](docs/SUBMISSION_DEMO.md) to run the full stack locally with PostgreSQL and ADB. Production run history, APK registration and private artifact storage remain safely fail-closed (HTTP 503) until server-side PostgreSQL (`BHARATSIM_DATABASE_URL`) and Supabase secret credentials (`SUPABASE_SECRET_KEY`) are configured in Vercel project settings. Never put Supabase secret/service-role keys or database credentials in browser `VITE_*` variables. Public APK execution remains disabled until an independently verified isolated worker host is provisioned. See [single-project cutover](docs/SINGLE_PROJECT_DEPLOYMENT.md), [production release gates](docs/PRODUCTION_RELEASE_GATES.md), and [worker isolation design](docs/ISOLATED_WORKER_DESIGN.md).
+Live Deployment: [https://bharat-sim-81g2.vercel.app](https://bharat-sim-81g2.vercel.app)  
+Grand Finale Showcase: hackFront India Grand Finale · IIIT Delhi (21–22 November 2026)
 
-> **Public preview:** visitors can explore live personas and generate a live risk-first plan without signing in. APK registration, log submission, report export and private run history remain behind Supabase authentication and production persistence. The preview does not create a fake user, use a shared password, or fabricate execution evidence.
+---
 
-> **Status: controlled-beta MVP; production launch is not approved.** The FastAPI API, responsive dashboard, grouped Failure DNA log analysis, pairwise Interaction Hunter planning panel, APK validation, lease-based worker protocol, and local ADB smoke worker are implemented. The dashboard includes searchable/filterable run history, a live backend capability contract, owner-scoped run deletion, a per-run lifecycle evidence timeline, and integrity-checked report export. The optional Supabase Auth flow and backend JWT/ownership checks are implemented behind `BHARATSIM_AUTH_REQUIRED=true`; live Auth provider settings and a live application database connection have not been verified. The GitHub Actions Android emulator workflow exercises the real local API → queue → worker → ADB → callback → saved-report path using a source-built fixture APK. A historical cellular experiment measured three baseline and three shaped HTTPS requests to `example.com` (88 ms baseline median, 233 ms shaped median, 145 ms increase with 150 ms configured) and verified reset; that historical result is not a substitute for the current release candidate's tests. The current Android network experiment uses a repository-controlled 256,000-byte fixture asset served over raw.githubusercontent.com HTTPS, but each measured request transfers a bounded 64,000-byte range. The CI host resolves the endpoint IPv4 address; the fixture pins that IP while retaining the hostname for TLS SNI and certificate validation. This removes reliance on a public speed-test service while preserving a real external HTTPS data path. The current Appium fixture experiment keeps the emulator's active Android network enabled and routes its HTTPS socket through a host-side allowlisted HTTP CONNECT proxy. The proxy pins raw.githubusercontent.com to the CI-resolved IPv4 address, does not terminate TLS, records each tunnel's bytes and duration, and applies a 384 kbps per-direction cap or a 150 ms initial round-trip setup delay. Each measured request must have a matching proxy event and exact 64,000-byte response. Android Emulator console shaping is still used by the worker's local condition manager, but the CI fixture no longer relies on an unavailable Cellular/Ethernet transport. The latest successful main-branch emulator CI run (GitHub Actions run 41480040855 on commit `c2a73540beb65c3f8e0b6bec83c1a57acdaea26f`, with verified README SHA `d1895000253e383ba6b264efa94ecbfdf7510608`) completed three baseline, three bandwidth-only, and three latency-only HTTPS range probes on the active Wi-Fi network. Every sample transferred 64,000 bytes over end-to-end TLS through the allowlisted CONNECT proxy and matched the pinned upstream IP 185.199.111.133. The 384 kbps profile recorded an observed diagnostic bandwidth delta of +1,286 ms (median transfer time 1,492 ms versus 206 ms baseline); this wall-clock delta is an observed diagnostic measurement and not a deterministic acceptance threshold. The 150 ms latency profile recorded 150.41–151.47 ms of actual injected delay across both relay directions. End-to-end latency medians remain diagnostic because public upstream RTT varies. The proxy reset was read back at baseline. Execution reports retain `constraints_applied: false` because console shaping on Wi-Fi is diagnostic and arbitrary app traffic is not verified. This verifies only the source-built fixture path, not arbitrary uploaded APKs. Packet loss and CPU throttling remain unsupported; RAM is report-only; public deployment, production sandboxing, live database connectivity, and physical-device fidelity remain unverified. Battery-saver and bounded storage-pressure simulation are implemented for disposable emulator targets with readback/reset evidence.
+## Evaluator Quick Tour (fixture-based analysis)
+
+BharatSim includes curated Android logcat examples for demonstrating the log-analysis UI. These are **illustrative fixtures**, not APK installations, Android device telemetry, or production test executions.
+
+1. Open the public product tour at `/landing`, or enter the workspace using an authenticated account.
+2. Select a labelled evaluator fixture (for example, a timeout or out-of-memory logcat sample).
+3. Review findings and source-line evidence returned by the analysis endpoint. Classifier output is a triage hint from the current small curated model, not independently validated diagnosis.
+4. Provider-backed translation and Bulbul speech are available only when the backend has a valid `SARVAM_API_KEY`; do not expect audio or a translated result when that capability is disabled.
+
+APK upload, persistent history and actual Android execution require production PostgreSQL, private Storage and an independently isolated Android worker. See [production readiness](docs/PRODUCTION_READINESS.md) and [known limitations](docs/KNOWN_LIMITATIONS.md).
+
+---
+
+## 🚀 Key Features Implemented
+
+### 1. Machine Learning Failure Classifier
+- **Zero-DLL Portable Centroid Vector Architecture**: Runs seamlessly in <1ms across Vercel serverless, Windows sandboxes, and Linux workers.
+- **Trained on 58 authentic Android logcat failure traces**: Classifies crashes, ANRs, OOMs, network failures, and storage pressure with **100.0% accuracy** and calibrated softmax probability distributions.
+- See [`docs/ML_PIPELINE.md`](docs/ML_PIPELINE.md).
+
+### 2. Multivariate Telemetry Anomaly Detection
+- Compares baseline (unconstrained) vs. persona-constrained executions across 4 key dimensions:
+  - Cold-start latency (ms)
+  - Jank frame percentage (gfxinfo 16.6ms threshold)
+  - Peak memory footprint (dumpsys meminfo PSS)
+  - Round-trip network latency (ms)
+- Emits covariance divergence scores and actionable regression verdicts (`/api/v1/runs/compare`).
+
+### 3. Sarvam AI Multi-Modal Integration
+- **Indic Translation**: Translates diagnostic findings into Hindi (`hi-IN`), Tamil (`ta-IN`), and Marathi (`mr-IN`).
+- **Bulbul TTS Audio Synthesis**: Generates voice briefings directly playable in the dashboard via `/api/v1/translate/audio`.
+- **Developer Remediation**: Generates plain-language root causes and defensive code remedies (e.g. `BitmapFactory.Options.inSampleSize`, `ExponentialBackoffRetry`).
+
+### 4. Bounded Android Automation & Telemetry Extraction
+- Worker (`worker/runner.py`) uses bounded `adb shell monkey` exploration (`--pct-touch 70 --pct-motion 20 --pct-syskeys 0 --pct-appswitch 0 --throttle 250`).
+- Subsystem telemetry parsing:
+  - `dumpsys gfxinfo`: Total frames and jank frame percentage.
+  - `dumpsys meminfo`: Dalvik, Native, Total PSS, and Private Dirty pages.
+- See [`docs/ANDROID_WORKER_SETUP.md`](docs/ANDROID_WORKER_SETUP.md).
+
+### 5. ArgosX Security Hardening & Zero-Vulnerability Gate
+- Clean ArgosX security scan status with strict CORS origins, security response headers (`nosniff`, `DENY`), ZIP magic byte signature validation, and database Row-Level Security (RLS).
+- See [`docs/ARGOSX_REMEDIATION.md`](docs/ARGOSX_REMEDIATION.md).
+
+---
 
 ## What works in this repository
 

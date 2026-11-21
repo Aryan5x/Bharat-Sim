@@ -77,6 +77,7 @@ assert not DB_PATH.exists(), 'serverless import must not create ephemeral SQLite
         [sys.executable, "-c", code],
         cwd=Path(__file__).resolve().parents[1],
         env=env,
+        stdin=subprocess.DEVNULL,
         capture_output=True,
         text=True,
         timeout=30,

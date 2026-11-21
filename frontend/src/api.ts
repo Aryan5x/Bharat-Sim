@@ -3,9 +3,11 @@ export const API = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 export type Capabilities = {
   database_persistence?: boolean;
   analysis_persistence?: boolean;
+  max_upload_mb?: number;
   apk_upload: boolean; direct_apk_upload: boolean; log_analysis: boolean; risk_planner: boolean;
   failure_fingerprinting: boolean; bharat_score: boolean; android_execution: boolean;
   worker_dispatch: boolean; network_shaping: boolean; sarvam_translation: boolean;
+  sarvam_audio_tts?: boolean; ml_classifier?: boolean; evaluator_scenarios?: boolean; run_comparison?: boolean;
   emulator_network_controls: {
     latency: boolean; bandwidth: boolean; configuration_readback: boolean;
     packet_loss: boolean; outage_and_recovery: boolean; arbitrary_app_traffic_verified: boolean; scope: string;
@@ -50,6 +52,18 @@ export type Finding = {
   evidence_context?: Array<{ line: number; text: string; relation: string }>;
   impact_priority?: { score: number; label: string; persona_risk: string; warning: string };
   root_cause_hypothesis?: { statement: string; confidence: string; validation_steps: string[]; status: string };
+  ml_classification?: {
+    category: string;
+    confidence: number;
+    probabilities?: Record<string, number>;
+  };
+  sarvam_explanation?: {
+    root_cause: string;
+    impact: string;
+    remediation: string;
+    defensive_code?: string;
+    hindi_explanation?: string;
+  };
 };
 
 export type Analysis = {
@@ -293,6 +307,36 @@ export const fallbackPersonas: Persona[] = [
     description: "Slow throughput, high latency and intermittent packet loss."
   },
   {
+    id: "crowded-station",
+    name: "Crowded Station",
+    device: "Android 10 · 2 GB RAM",
+    ram_mb: 2048,
+    storage_free_mb: 500,
+    network: "congested-3g",
+    latency_ms: 250,
+    down_kbps: 384,
+    up_kbps: 128,
+    packet_loss_pct: 3,
+    battery_saver: true,
+    risk: "high",
+    description: "Congested public network with packet drops and bandwidth contention."
+  },
+  {
+    id: "congested-urban-4g",
+    name: "Congested Urban 4G",
+    device: "Android 11 · 3 GB RAM",
+    ram_mb: 3072,
+    storage_free_mb: 1200,
+    network: "throttled-4g",
+    latency_ms: 120,
+    down_kbps: 1500,
+    up_kbps: 400,
+    packet_loss_pct: 1,
+    battery_saver: false,
+    risk: "medium",
+    description: "Peak-hour cell tower congestion with buffer bloat and jitter."
+  },
+  {
     id: "storage-pressure",
     name: "Low storage",
     device: "Android 10 · 2 GB RAM",
@@ -446,3 +490,91 @@ export type RunEvent = {
   actor_id?: string | null;
   payload: Record<string, unknown>;
 };
+
+export type EvaluatorScenario = {
+  id: string;
+  name: string;
+  persona_id: string;
+  persona_name: string;
+  description: string;
+  app_name: string;
+  package_name: string;
+  logcat: string;
+  expected_failure: string;
+  expected_ml_category: string;
+  summary: {
+    finding_count: number;
+    critical: number;
+    high: number;
+    medium: number;
+  };
+  metrics: {
+    cold_start_ms: number;
+    jank_frame_pct: number;
+    memory_peak_mb: number;
+    network_latency_ms: number;
+  };
+  sarvam_insight: {
+    hi: string;
+    en: string;
+  };
+};
+
+export type SarvamAudioResponse = {
+  audio_base64: string;
+  format: string;
+  language_code: string;
+  speaker: string;
+  is_fixture: boolean;
+  note?: string;
+};
+
+export type AnomalyDetail = {
+  metric: string;
+  baseline: number | string;
+  constrained: number | string;
+  delta_pct: number;
+  status: "severe_anomaly" | "elevated" | "normal";
+  explanation?: string;
+};
+
+export type ComparisonResult = {
+  baseline_run_id: string;
+  constrained_run_id: string;
+  baseline_metrics: Record<string, number>;
+  constrained_metrics: Record<string, number>;
+  deltas: Record<string, { delta: number; delta_pct: number }>;
+  anomaly_detected: boolean;
+  anomaly_score: number;
+  anomalies: AnomalyDetail[];
+  verdict: string;
+  details: string;
+};
+
+export async function fetchEvaluatorScenarios(): Promise<EvaluatorScenario[]> {
+  const res = await api<{ items: EvaluatorScenario[] }>("/api/v1/evaluator/scenarios");
+  return res.items;
+}
+
+export async function fetchEvaluatorScenario(id: string): Promise<EvaluatorScenario> {
+  return await api<EvaluatorScenario>("/api/v1/evaluator/scenarios/" + encodeURIComponent(id));
+}
+
+export async function synthesizeSpeechAudio(text: string, languageCode: string = "hi-IN"): Promise<SarvamAudioResponse> {
+  return await api<SarvamAudioResponse>("/api/v1/translate/audio", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, target_language_code: languageCode })
+  });
+}
+
+export async function compareRuns(baselineRunId: string, constrainedRunId: string): Promise<ComparisonResult> {
+  return await api<ComparisonResult>("/api/v1/runs/compare", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      baseline_run_id: baselineRunId,
+      constrained_run_id: constrainedRunId
+    })
+  });
+}

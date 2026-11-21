@@ -18,8 +18,18 @@ from typing import Any, Literal
 from urllib.parse import parse_qs, quote, urlsplit
 
 import jwt
-from .sarvam import SarvamProviderError, SarvamRateLimited, translate_report_text
+from .sarvam import (
+    SarvamProviderError,
+    SarvamRateLimited,
+    translate_report_text,
+    generate_speech_audio,
+    explain_failure_with_sarvam,
+    get_sarvam_api_key,
+)
 from .evidence_fusion import fuse_worker_report
+from .ml_classifier import classify_logcat_stream
+from .anomaly_detector import detect_regressions
+from .evaluator_scenarios import get_all_scenarios, get_scenario_by_id
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
@@ -434,12 +444,12 @@ PERSONAS: dict[str, dict[str, Any]] = {
     # emulated as TCP retransmission stalls, connection resets, drops).
     "budget-android": {
         "id": "budget-android", "name": "Budget Android", "device": "Android 11 · 2 GB RAM · 720p",
-        "ram_mb": 2048, "storage_free_mb": 300, "fill_storage": True, "network": "budget-4g",
-        "latency_ms": 120, "delay_ms": [80, 160], "down_kbps": 2000, "up_kbps": 600, "packet_loss_pct": 0,
+        "ram_mb": 2048, "storage_free_mb": 500, "fill_storage": True, "network": "unstable-4g",
+        "latency_ms": 180, "delay_ms": [120, 240], "down_kbps": 1000, "up_kbps": 300, "packet_loss_pct": 2,
         "reset_pct": 0, "drop_seconds": 0, "battery_saver": True, "risk": "high",
         "expected_risks": ["oom", "storage", "anr", "slow cold start"],
         "cpu_constraint": "not applied: the emulator exposes no per-app CPU throttle; reported as unsupported",
-        "description": "2 GB RAM phone on Android 11 with battery saver on and only about 300 MB of storage left.",
+        "description": "2 GB RAM phone on Android 11 with battery saver on, only about 500 MB of storage left, on unstable 4G (about 1 Mbps, 180 ms, 2% loss).",
     },
     "edge-village": {
         "id": "edge-village", "name": "Edge Village", "device": "Android 11 · 2 GB RAM · 720p",
@@ -457,8 +467,8 @@ PERSONAS: dict[str, dict[str, Any]] = {
         "expected_risks": ["network timeouts", "slow loads", "jank while waiting"],
         "description": "Busy railway platform on 3G: 384 kbps shared bandwidth, 150-600 ms jitter and 3% loss.",
     },
-    "urban-4g": {
-        "id": "urban-4g", "name": "Congested Urban 4G", "device": "Android 11 · 2 GB RAM · 720p",
+    "congested-urban-4g": {
+        "id": "congested-urban-4g", "name": "Congested Urban 4G", "device": "Android 11 · 2 GB RAM · 720p",
         "ram_mb": 2048, "storage_free_mb": 900, "fill_storage": False, "network": "congested-4g",
         "latency_ms": 200, "delay_ms": [60, 350], "down_kbps": 3000, "up_kbps": 1000, "variable_kbps": [600, 6000],
         "packet_loss_pct": 1, "reset_pct": 1.5, "drop_seconds": 8, "battery_saver": False, "risk": "medium",
@@ -467,7 +477,7 @@ PERSONAS: dict[str, dict[str, Any]] = {
     },
     "baseline": {
         "id": "baseline", "name": "Baseline", "device": "Android 11 · 2 GB RAM · 720p",
-        "ram_mb": 2048, "storage_free_mb": 4000, "fill_storage": False, "network": "unshaped",
+        "ram_mb": 2048, "storage_free_mb": 8000, "fill_storage": False, "network": "unshaped",
         "latency_ms": 0, "delay_ms": [0, 0], "down_kbps": 0, "up_kbps": 0, "packet_loss_pct": 0,
         "reset_pct": 0, "drop_seconds": 0, "battery_saver": False, "risk": "low",
         "expected_risks": [],
@@ -558,6 +568,20 @@ def resolve_persona(persona_id: str, custom: dict[str, Any] | str | None) -> tup
         raise HTTPException(status_code=422, detail="Unknown persona_id")
     return PERSONAS[persona_id], None
 
+class SarvamAudioRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+    target_language_code: Literal["hi-IN", "ta-IN", "mr-IN", "en-IN"] = "hi-IN"
+    speaker: str = "meera"
+
+class ExplainFailureRequest(BaseModel):
+    category: str = Field(min_length=1, max_length=50)
+    evidence: str = Field(default="", max_length=1000)
+    persona_id: str = "budget-android"
+    language_code: Literal["en-IN", "hi-IN"] = "en-IN"
+
+class CompareRunsRequest(BaseModel):
+    baseline_run_id: str
+    constrained_run_id: str
 
 class SignedUploadRequest(BaseModel):
     persona_id: str = "budget-android"
@@ -992,6 +1016,11 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
                     ["Inspect the failing path and available disk space.", "Verify cache eviction and transactional write recovery.", "Repeat with a measured storage budget."]),
     }
     findings: list[dict[str, Any]] = []
+    ml_matches = classify_logcat_stream(text)
+    ml_counts: dict[str, int] = {}
+    for m in ml_matches:
+        ml_counts[m["category"]] = ml_counts.get(m["category"], 0) + 1
+
     for group in sorted(groups.values(), key=lambda item: (item["first_line"], item["kind"], item["fingerprint"])):
         explanation, recommendation, validation = explanations[group["kind"]]
         base = {"critical": 100, "high": 72, "medium": 44}[group["severity"]]
@@ -1018,6 +1047,24 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
             "validation_steps": validation,
             "status": "unconfirmed",
         }
+        # Enrich with ML classification & Sarvam AI developer explanation
+        ev_sample = group["evidence"][0]["text"] if group["evidence"] else ""
+        group["sarvam_explanation"] = explain_failure_with_sarvam(group["kind"], ev_sample, persona["name"])
+        matched_confs = [m["confidence"] for m in ml_matches if m["category"] == group["kind"]]
+        if matched_confs:
+            group["ml_confidence"] = max(matched_confs)
+            group["ml_classification"] = {
+                "category": group["kind"],
+                "confidence": group["ml_confidence"],
+                "algorithm": "TF-IDF weighted class-centroid classifier (portable pure Python)",
+            }
+            group["classification_method"] = "ml_corroborated"
+        else:
+            # Keep deterministic rule detections distinct from model output.
+            # Never invent a confidence value for an uncorroborated finding.
+            group["ml_confidence"] = None
+            group["ml_classification"] = None
+            group["classification_method"] = "deterministic_rule"
         findings.append(group)
 
     critical = sum(1 for item in findings if item["severity"] == "critical")
@@ -1044,6 +1091,12 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
             "group_count": len(dna),
             "total_occurrences": total_occurrences,
             "method": "Normalized line fingerprints grouped by signal category; occurrences and source line numbers are retained.",
+        },
+        "ml_pipeline": {
+            "model_version": "1.0.0",
+            "algorithm": "TF-IDF weighted class-centroid classifier (portable pure Python)",
+            "signals_classified": len(ml_matches),
+            "signal_counts": ml_counts,
         },
         "root_cause_hypotheses": [item["root_cause_hypothesis"] | {"finding_id": item["id"], "kind": item["kind"]} for item in findings],
         "user_impact": {
@@ -1417,8 +1470,8 @@ def complete_apk_upload(run_id: str, request: Request):
 async def create_run(
     request: Request,
     persona_id: str = Form("budget-android"),
-    custom_persona: str | None = Form(None),
     apk: UploadFile = File(...),
+    custom_persona: str | None = Form(None),
 ):
     if not apk.filename:
         raise HTTPException(status_code=422, detail="An APK file is required to register a test run")
@@ -1543,14 +1596,12 @@ def production_worker_execution_enabled() -> bool:
         return False
     if APP_ENV not in {"production", "prod"}:
         return True
-    # Egress: the worker's shaping proxy refuses private, loopback, link-local and
-    # metadata addresses (SSRF guard). Apps that open raw sockets outside the system
-    # proxy are not blocked, so egress is reported as a capability, not a gate.
     return all(
         os.getenv(name, "false").strip().lower() == "true"
         for name in (
             "BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED",
             "BHARATSIM_WORKER_ISOLATION_ATTESTED",
+            "BHARATSIM_WORKER_EGRESS_RESTRICTED",
         )
     )
 
@@ -2083,11 +2134,175 @@ def translate_report(payload: SarvamTranslationRequest):
         raise HTTPException(status_code=502, detail="Sarvam translation is temporarily unavailable. Your original report is unchanged.")
 
 
+@app.post("/api/v1/translate/audio")
+def text_to_speech(payload: SarvamAudioRequest):
+    """Generate spoken vernacular audio from diagnostic report using Sarvam Bulbul TTS."""
+    if not payload.text.strip():
+        raise HTTPException(status_code=422, detail="Audio synthesis text cannot be blank.")
+    try:
+        return generate_speech_audio(payload.text, payload.target_language_code, payload.speaker)
+    except SarvamRateLimited:
+        raise HTTPException(status_code=429, detail="Sarvam TTS rate limit reached. Please retry shortly.")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Sarvam audio generation error: {exc}")
+
+
+@app.post("/api/v1/explain/failure")
+def explain_failure(payload: ExplainFailureRequest):
+    """Generate plain-language developer remediation and code fixes using Sarvam AI."""
+    persona_name = PERSONAS.get(payload.persona_id, {}).get("name", "Budget Android")
+    return explain_failure_with_sarvam(payload.category, payload.evidence, persona_name, payload.language_code)
+
+
+@app.get("/api/v1/evaluator/scenarios")
+def list_evaluator_scenarios():
+    """Return pre-packaged, authenticated demonstration scenarios for rapid evaluation."""
+    return {"items": get_all_scenarios()}
+
+
+@app.get("/api/v1/evaluator/scenarios/{scenario_id}")
+def get_evaluator_scenario(scenario_id: str):
+    """Retrieve details for a specific evaluator demonstration scenario."""
+    scenario = get_scenario_by_id(scenario_id)
+    if not scenario:
+        raise HTTPException(status_code=404, detail="Evaluator scenario not found")
+    return scenario
+
+
+@app.post("/api/v1/runs/compare")
+def compare_runs(payload: CompareRunsRequest, request: Request):
+    """Compare owner-scoped completed runs using persisted telemetry only."""
+    if payload.baseline_run_id == payload.constrained_run_id:
+        raise HTTPException(status_code=400, detail="Choose two different runs to compare.")
+
+    owner_id = getattr(request.state, "owner_id", None)
+    with db() as conn:
+        if owner_id is None:
+            baseline_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id IS NULL",
+                (payload.baseline_run_id,),
+            ).fetchone()
+            constrained_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id IS NULL",
+                (payload.constrained_run_id,),
+            ).fetchone()
+        else:
+            baseline_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id=?",
+                (payload.baseline_run_id, owner_id),
+            ).fetchone()
+            constrained_row = conn.execute(
+                "SELECT id,persona_id,status,result_json FROM runs WHERE id=? AND owner_id=?",
+                (payload.constrained_run_id, owner_id),
+            ).fetchone()
+
+        # Use the same not-found response for missing and foreign-owned IDs.
+        if not baseline_row or not constrained_row:
+            raise HTTPException(status_code=404, detail="One or both runs were not found.")
+        if baseline_row["status"] != "completed" or constrained_row["status"] != "completed":
+            raise HTTPException(status_code=409, detail="Only completed runs with worker reports can be compared.")
+
+        try:
+            baseline_report = json.loads(baseline_row["result_json"] or "{}")
+            constrained_report = json.loads(constrained_row["result_json"] or "{}")
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="A run contains an invalid report payload.") from None
+
+    def number(value):
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            match = re.match(r"^\s*(-?\d+(?:\.\d+)?)", value)
+            return float(match.group(1)) if match else None
+        return None
+
+    def telemetry(report):
+        values = {}
+        startup = number(report.get("startup_latency_ms"))
+        if startup is not None:
+            values["cold_start_ms"] = startup
+
+        gfx = report.get("telemetry_gfx")
+        if isinstance(gfx, dict):
+            jank = number(gfx.get("jank_percentage"))
+            if jank is not None:
+                values["jank_percentage"] = jank
+
+        memory = report.get("telemetry_mem")
+        if isinstance(memory, dict):
+            pss = number(memory.get("total_pss_mb"))
+            if pss is not None:
+                values["peak_memory_mb"] = pss
+
+        network_latency = number(report.get("network_latency_ms"))
+        if network_latency is not None:
+            values["network_latency_ms"] = network_latency
+        return values
+
+    baseline_metrics = telemetry(baseline_report)
+    constrained_metrics = telemetry(constrained_report)
+    common_metrics = sorted(set(baseline_metrics) & set(constrained_metrics))
+    if not common_metrics:
+        raise HTTPException(
+            status_code=422,
+            detail="These runs do not share any persisted comparable telemetry. No synthetic defaults are used.",
+        )
+
+    baseline_metrics = {key: baseline_metrics[key] for key in common_metrics}
+    constrained_metrics = {key: constrained_metrics[key] for key in common_metrics}
+    comparison = detect_regressions(baseline_metrics, constrained_metrics)
+
+    deltas = {}
+    for key in common_metrics:
+        base_value = baseline_metrics[key]
+        constrained_value = constrained_metrics[key]
+        delta = round(constrained_value - base_value, 2)
+        deltas[key] = {
+            "delta": delta,
+            "delta_pct": round((delta / base_value) * 100, 1) if base_value else 0.0,
+        }
+
+    anomalies = []
+    for item in comparison["anomalies"]:
+        metric = item["metric"]
+        base_value = number(item.get("baseline"))
+        constrained_value = number(item.get("constrained"))
+        delta = number(item.get("delta"))
+        delta_pct = (
+            round((delta / base_value) * 100, 1)
+            if delta is not None and base_value not in (None, 0)
+            else 0.0
+        )
+        anomalies.append({
+            "metric": metric,
+            "baseline": item.get("baseline"),
+            "constrained": item.get("constrained"),
+            "delta_pct": delta_pct,
+            "status": "severe_anomaly" if item.get("severity") == "critical" else "elevated",
+            "explanation": item.get("explanation", ""),
+        })
+
+    return {
+        "baseline_run_id": payload.baseline_run_id,
+        "constrained_run_id": payload.constrained_run_id,
+        "baseline_metrics": baseline_metrics,
+        "constrained_metrics": constrained_metrics,
+        "deltas": deltas,
+        "anomaly_detected": comparison["is_anomalous"],
+        "anomaly_score": comparison["anomaly_score"],
+        "anomalies": anomalies,
+        "verdict": "Regression signals detected" if comparison["is_anomalous"] else "No thresholded regression signals detected",
+        "details": comparison["summary"],
+    }
+
 @app.get("/api/v1/capabilities")
 def capabilities():
     persistent_database_required = requires_persistent_database()
     database_available = database_is_available() if persistent_database_required else True
     worker = worker_dispatch_configured()
+    sarvam_configured = len(get_sarvam_api_key()) >= 16
     # Private APK intake can persist a run while it waits for an approved worker.
     # Execution remains independently gated by worker_dispatch_configured().
     upload_storage_available = STORAGE_ENABLED if persistent_database_required else True
@@ -2095,9 +2310,11 @@ def capabilities():
     direct_upload_available = database_available and STORAGE_ENABLED
     return {
         "database_persistence": database_available,
+        "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
         "log_analysis": True, "analysis_persistence": database_available, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
+        "ml_classifier": True, "sarvam_audio_tts": sarvam_configured, "evaluator_scenarios": True, "run_comparison": database_available,
         "android_execution": False,
         "worker_dispatch": worker,
         "network_shaping": False,
@@ -2117,12 +2334,12 @@ def capabilities():
             "unsupported": ["packet_loss", "cpu_constraint"],
             "scope": "Worker executes conditions on disposable Android Emulator targets only; active data-plane app traffic is unverified",
         },
-        "sarvam_translation": len(os.getenv("SARVAM_API_KEY", "").strip()) >= 16,
+        "sarvam_translation": sarvam_configured,
         "notes": [
             "Production worker dispatch remains disabled until BHARATSIM_PUBLIC_APK_EXECUTION_ENABLED, BHARATSIM_WORKER_ISOLATION_ATTESTED, and BHARATSIM_WORKER_EGRESS_RESTRICTED are all true. These flags are operator attestations, not cryptographic proof; independently verify the disposable VM and egress policy before enabling them.",
             "Worker dispatch is configured only when BHARATSIM_WORKER_TOKEN is set and the production safety gate is open; android_execution remains false here because this API cannot prove a live emulator has executed an APK. Check /api/v1/workers for recent worker heartbeats.",
             "The worker supports Android Emulator console latency and bandwidth controls plus reversible battery-saver and bounded storage-pressure simulation with readback/reset evidence. Full persona shaping remains false because packet loss, CPU throttling, RAM restriction, outage/recovery, and arbitrary-app traffic verification are not supported.",
-            "Sarvam translation is available only when SARVAM_API_KEY is configured; only the user-selected condensed report summary is sent.",
+            "Sarvam translation and Bulbul speech are available only when SARVAM_API_KEY is configured; only user-selected bounded text is sent to the provider.",
             "When private Storage is configured, APK bytes use short-lived signed uploads directly to Supabase Storage, bypassing Vercel function request-body limits. The API verifies the stored object size before queueing.",
             "Worker result payloads are bounded and protected by lease tokens; inline artifact payloads are limited to 250 KB.",
         ],

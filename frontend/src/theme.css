@@ -1,0 +1,159 @@
+/* BharatSim design layer — navy/graphite surfaces with restrained electric-blue semantics. */
+:root{
+  color-scheme:dark;
+  --bg:#0b1020;
+  --panel:#111a2b;
+  --line:#26344b;
+  --muted:#9aa8bf;
+  --green:#75aaff;
+  --green-dark:#1b3458;
+  --display:'Manrope',sans-serif;
+  --mono:'DM Mono',monospace;
+  background:var(--bg);
+}
+html,body,#root{min-height:100%;background:var(--bg)}
+body{color:#e8eef9}
+.sidebar{background:#0c1424;border-color:#202e45}
+.topbar{background:rgba(11,16,32,.94);border-color:#202e45;backdrop-filter:blur(14px)}
+.workspace,.worker-card,.icon-button{background:#121e32;border-color:#2a3b56}
+.workspace-icon,.avatar{background:#1b3458;border-color:#31527f;color:#9bc4ff}
+.nav-item{color:#aebbd0}
+.nav-item:hover{background:#17243a;color:#f2f6ff}
+.nav-item.active{background:#172b49;border-color:#31527f;color:#9bc4ff}
+.nav-label,.section-kicker{color:#91a5c3}
+.hero h1 em,.sidebar-bottom>a,.footer-green{color:#8bbaff}
+.eyebrow-line{background:#75aaff}
+.flag{border-color:#31527f;color:#9bc4ff}
+.primary-button{background:#75aaff;border-color:#75aaff;color:#08152a}
+.primary-button:hover{background:#91bdff;border-color:#91bdff}
+.secondary-button{background:#16243a;border-color:#334766;color:#dce7f8}
+.secondary-button:hover{background:#1d304c}
+.metric-card,.panel,.workspace-status-card{background:#111a2b;border-color:#293952}
+.panel-heading,.metric-card,.workspace-status-card{box-shadow:none}
+.icon-button:hover{border-color:#75aaff;color:#b9d6ff}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline-color:#8bbaff}
+input,select,textarea{accent-color:#75aaff}
+::selection{background:#315b91;color:#fff}
+.theme-toggle{width:34px;height:34px}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f4f7fc;
+  --panel:#ffffff;
+  --line:#dce4f0;
+  --muted:#60708a;
+  --green:#2563eb;
+  --green-dark:#e8f0ff;
+  background:var(--bg);
+}
+:root[data-theme="light"] body,
+:root[data-theme="light"] #root,
+:root[data-theme="light"] .app-shell,
+:root[data-theme="light"] .main{background:#f4f7fc;color:#17243a}
+:root[data-theme="light"] .sidebar{background:#fff;border-color:#dce4f0}
+:root[data-theme="light"] .topbar{background:rgba(255,255,255,.94);border-color:#dce4f0}
+:root[data-theme="light"] .brand b,
+:root[data-theme="light"] .breadcrumbs b,
+:root[data-theme="light"] .hero h1,
+:root[data-theme="light"] .panel h2,
+:root[data-theme="light"] .workspace b,
+:root[data-theme="light"] .metric-value,
+:root[data-theme="light"] .worker-card b{color:#17243a}
+:root[data-theme="light"] .brand small,
+:root[data-theme="light"] .workspace small,
+:root[data-theme="light"] .breadcrumbs,
+:root[data-theme="light"] .hero p,
+:root[data-theme="light"] .panel p,
+:root[data-theme="light"] .metric-foot,
+:root[data-theme="light"] .sidebar-bottom>p{color:#61708a}
+:root[data-theme="light"] .workspace,
+:root[data-theme="light"] .worker-card,
+:root[data-theme="light"] .icon-button,
+:root[data-theme="light"] .metric-card,
+:root[data-theme="light"] .panel,
+:root[data-theme="light"] .workspace-status-card,
+:root[data-theme="light"] .float-chip,
+:root[data-theme="light"] .secondary-button{background:#fff;border-color:#dce4f0;color:#263750}
+:root[data-theme="light"] .workspace-icon,
+:root[data-theme="light"] .avatar{background:#e8f0ff;border-color:#cbdcff;color:#1d55b5}
+:root[data-theme="light"] .nav-item{color:#52627b}
+:root[data-theme="light"] .nav-item:hover{background:#f0f4fb;color:#1d2c43}
+:root[data-theme="light"] .nav-item.active{background:#eaf1ff;border-color:#c8d9fb;color:#1d55b5}
+:root[data-theme="light"] .nav-label,
+:root[data-theme="light"] .section-kicker,
+:root[data-theme="light"] .eyebrow{color:#526b91}
+:root[data-theme="light"] .hero h1 em,
+:root[data-theme="light"] .sidebar-bottom>a,
+:root[data-theme="light"] .footer-green{color:#1d55b5}
+:root[data-theme="light"] .flag{border-color:#c8d9fb;color:#1d55b5}
+:root[data-theme="light"] .primary-button{background:#2563eb;border-color:#2563eb;color:#fff}
+:root[data-theme="light"] .primary-button:hover{background:#1d4ed8;border-color:#1d4ed8}
+:root[data-theme="light"] .secondary-button:hover,
+:root[data-theme="light"] .icon-button:hover{background:#edf3ff;border-color:#b8cdf4;color:#1d55b5}
+:root[data-theme="light"] input,
+:root[data-theme="light"] select,
+:root[data-theme="light"] textarea{background:#fff;color:#17243a;border-color:#cfd9e8}
+:root[data-theme="light"] .table-wrap{overflow-x:auto}
+:root[data-theme="light"] .table-wrap table{color:#24334b}
+:root[data-theme="light"] .table-wrap th{color:#60708a}
+:root[data-theme="light"] .table-wrap td{border-color:#e4eaf3}
+:root[data-theme="light"] .empty-state{color:#263750}
+@media(max-width:900px){
+  .topbar{padding-inline:20px}
+  .content{padding-inline:20px}
+}
+@media(max-width:600px){
+  .topbar{height:58px;padding-inline:14px}
+  .content{padding:22px 14px 0}
+  .top-actions{gap:8px}
+  .api-state{font-size:9px}
+  .theme-toggle{flex:0 0 34px}
+}
+
+:root[data-theme="light"] .auth-screen{background:#f4f7fc;color:#17243a}
+:root[data-theme="light"] .auth-card{background:#fff;border:1px solid #dce4f0;box-shadow:0 24px 70px rgba(22,40,70,.10)}
+:root[data-theme="light"] .auth-brand b,
+:root[data-theme="light"] .auth-card h1,
+:root[data-theme="light"] .auth-card label{color:#17243a}
+:root[data-theme="light"] .auth-copy,
+:root[data-theme="light"] .auth-foot{color:#61708a}
+:root[data-theme="light"] .auth-switch,
+:root[data-theme="light"] .auth-demo-button{color:#2458b4}
+:root[data-theme="light"] .auth-session-bar,
+:root[data-theme="light"] .public-preview-bar{background:#eaf1ff;border-color:#c8d9fb;color:#1d3d70}
+:root[data-theme="light"] .modal-backdrop{background:rgba(15,23,42,.42)}
+:root[data-theme="light"] .modal-dialog{background:#fff;border-color:#dce4f0;color:#17243a;box-shadow:0 28px 80px rgba(15,23,42,.18)}
+:root[data-theme="light"] .modal-header{border-color:#e4eaf3}
+:root[data-theme="light"] .modal-header h2,
+:root[data-theme="light"] .modal-header h3,
+:root[data-theme="light"] .modal-body h4{color:#17243a}
+:root[data-theme="light"] .meta-card,
+:root[data-theme="light"] .scenario-log-preview,
+:root[data-theme="light"] .sarvam-insight-box,
+:root[data-theme="light"] .anomaly-card,
+:root[data-theme="light"] .verdict-banner{background:#f7f9fd;border-color:#dce4f0;color:#263750}
+:root[data-theme="light"] .scenario-desc,
+:root[data-theme="light"] .anomaly-explanation,
+:root[data-theme="light"] .audio-label{color:#52627b}
+:root[data-theme="light"] .evaluator-tour-banner{background:linear-gradient(115deg,#f7faff,#edf3ff);border-color:#d6e2f5;color:#17243a}
+:root[data-theme="light"] .tour-content h3,
+:root[data-theme="light"] .scenario-btn-text b{color:#17243a}
+:root[data-theme="light"] .tour-content p,
+:root[data-theme="light"] .scenario-btn-text small{color:#61708a}
+:root[data-theme="light"] .tour-scenario-btn{background:#fff;border-color:#dce4f0;color:#263750}
+:root[data-theme="light"] .tour-scenario-btn:hover{border-color:#a9c3f3;background:#f3f7ff}
+:root[data-theme="light"] .audio-error{color:#b42318}
+
+.auth-landing-link{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;color:var(--green);font-size:12px;font-weight:700;text-decoration:none}
+.auth-landing-link:hover{text-decoration:underline}
+.worker-defaults-note{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.55}
+.anomaly-explanation{margin:8px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+
+.api-docs-link{display:inline-flex;align-items:center;min-height:32px;padding:0 9px;border:1px solid var(--line);border-radius:7px;color:var(--muted);font-size:10px;font-weight:700;text-decoration:none;white-space:nowrap;transition:color .15s,border-color .15s,background .15s}
+.api-docs-link:hover{color:#dce9ff;border-color:#75aaff;background:#17243a}
+:root[data-theme="light"] .api-docs-link:hover{color:#1d55b5;border-color:#9db9ed;background:#edf3ff}
+
+.report-export-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:520px){.report-export-actions{width:100%;justify-content:flex-start}.report-export-actions .secondary-button{flex:1;justify-content:center}}
