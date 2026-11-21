@@ -86,6 +86,10 @@ export default function DiagnosisPanel({ runId, runFinished, reportedProblem }: 
             <span className={"risk-badge " + verdict.tone}>{verdict.label}</span>
             <p>{result.reproduction.summary}</p>
           </div>
+          <small className="speak-note">
+            Understood your problem as: {result.reproduction.symptom_label}
+            {result.reproduction.symptom_source ? ` (by ${result.reproduction.symptom_source})` : ""}. If that's wrong, reword it and diagnose again.
+          </small>
           {result.reproduction.evidence.length > 0 && (
             <details>
               <summary>What BharatSim measured ({result.reproduction.evidence.length})</summary>

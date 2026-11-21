@@ -155,3 +155,30 @@ def test_diagnose_any_run_with_typed_problem(monkeypatch):
 def test_diagnose_requires_sign_in(monkeypatch):
     monkeypatch.setattr(main, "AUTH_REQUIRED", True)
     assert client.post("/api/v1/runs/r1/diagnose", json={}).status_code == 401
+
+
+HINGLISH_CRASH = "Meri app khulte hi band ho jati hai. Kyun ho raha hai aur kaise fix karun?"
+
+
+def test_typed_problem_is_classified_by_sarvam(monkeypatch):
+    main._SARVAM_CALLS.clear()
+    monkeypatch.setattr(main, "db", fake_db([("r5", "completed", json.dumps(report({"crashes": 5}, CRASH_FINDING)), None, None)]))
+    calls = []
+
+    def fake_chat(system, user, schema, name, *a, **k):
+        calls.append(name)
+        if name == "bharatsim_test_spec":
+            return model_reply(symptom="crash", conditions=[])
+        return {"content": json.dumps({"why": "Main-thread exception at startup.", "fix_steps": ["Catch it"], "code_hint": "",
+                                       "confidence": "medium", "evidence_ids": ["R-1"]}), "request_id": "q", "model": "m", "latency_ms": 1}
+
+    monkeypatch.setattr(main, "chat_json", fake_chat)
+    body = client.post("/api/v1/runs/r5/diagnose", json={"problem": HINGLISH_CRASH}).json()
+    assert calls == ["bharatsim_test_spec", "bharatsim_diagnosis"]
+    assert body["reproduction"]["symptom"] == "crash" and body["reproduction"]["verdict"] == "REPRODUCED"
+    assert body["reproduction"]["symptom_source"] == "sarvam"
+
+
+def test_keyword_fallback_recognises_hinglish_crash():
+    assert testspec.rule_based_spec(HINGLISH_CRASH).symptom == "crash"
+    assert testspec.rule_based_spec("app khulte hi close ho jata hai").symptom == "crash"

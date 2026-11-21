@@ -139,7 +139,7 @@ export function runScenarioPayload(spec: TestSpec | null, scenarioId: string | n
 
 export type Diagnosis = {
   problem: string;
-  reproduction: { symptom: string; symptom_label: string; verdict: "REPRODUCED" | "NOT_REPRODUCED" | "CANNOT_CHECK" | "BLOCKED"; summary: string; evidence: { id: string; fact: string }[] };
+  reproduction: { symptom: string; symptom_label: string; verdict: "REPRODUCED" | "NOT_REPRODUCED" | "CANNOT_CHECK" | "BLOCKED"; summary: string; symptom_source?: string; evidence: { id: string; fact: string }[] };
   diagnosis: { why: string; fix_steps: string[]; code_hint: string; confidence: "low" | "medium" | "high" } | null;
   cited_evidence?: { id: string; fact: string }[];
   language_code?: string;

@@ -2886,14 +2886,29 @@ async def diagnose_run(run_id: str, payload: DiagnoseRunRequest, request: Reques
     if not problem:
         raise HTTPException(status_code=422, detail="Describe the problem you want diagnosed.")
     problem = testspec.redact(problem)[:1000]
-    symptom = spec.get("symptom") if (spec.get("symptom") and not payload.problem) else testspec.rule_based_spec(problem).symptom
     report = _load_json(row["result_json"])
     if row["status"] in ("queued", "leased", "awaiting_worker"):
         raise HTTPException(status_code=409, detail="The run is still waiting or executing; diagnose it when it finishes.")
+    symptom_source = "test plan"
+    if spec.get("symptom") and not payload.problem:
+        symptom = spec["symptom"]
+    else:
+        # A typed problem is classified by Sarvam (same schema as Speak-to-Test); keywords are only the fallback.
+        enforce_sarvam_budget(request)
+        try:
+            classified = await asyncio.to_thread(chat_json, testspec.SYSTEM_PROMPT, "Developer request:\n<<<\n" + problem + "\n>>>",
+                                                 testspec.model_json_schema(), "bharatsim_test_spec", 20, 600)
+            symptom = testspec.parse_model_output(classified["content"]).symptom
+            symptom_source = "sarvam"
+        except (SarvamProviderError, SarvamRateLimited, ValueError):
+            symptom = testspec.rule_based_spec(problem).symptom
+            symptom_source = "keyword fallback"
     repro = testspec.check_reproduction(symptom, report if isinstance(report, dict) else None)
+    repro["symptom_source"] = symptom_source
     if repro["verdict"] == "BLOCKED":
         return {"problem": problem, "reproduction": repro, "diagnosis": None, "translated_text": None}
-    enforce_sarvam_budget(request)
+    if symptom_source == "test plan":
+        enforce_sarvam_budget(request)
     # Diagnosis needs the failure lines themselves; send at most 2 per finding, redacted and truncated.
     excerpts = []
     for part in (report.get("constrained") or {}, report.get("baseline") or {}):
