@@ -44,7 +44,7 @@ export default function EvaluatorTourBanner({ onLoadScenario }: EvaluatorTourBan
         <div className="tour-content">
           <h3>Test with Real Indian Network & Device Constraints</h3>
           <p>
-            Load pre-verified crash & ANR telemetry scenarios. See real-time ML failure classification, anomaly detection, and Sarvam AI Indic translations.
+            Load curated fixture scenarios to inspect failure classification, telemetry comparisons and optional Indic explanations. These are illustrative inputs, not executed APK runs.
           </p>
           <div className="tour-scenario-buttons">
             {scenarios.map((sc) => (
@@ -70,7 +70,7 @@ export default function EvaluatorTourBanner({ onLoadScenario }: EvaluatorTourBan
           <div className="modal-dialog scenario-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <span className="section-kicker">PRE-VERIFIED DEMONSTRATION SCENARIO</span>
+                <span className="section-kicker">CURATED DEMONSTRATION FIXTURE</span>
                 <h2>{selectedScenario.name}</h2>
               </div>
               <button
@@ -105,6 +105,7 @@ export default function EvaluatorTourBanner({ onLoadScenario }: EvaluatorTourBan
 
               <p className="scenario-desc">{selectedScenario.description}</p>
 
+              <div className="scenario-metrics-label">Illustrative scenario inputs · not measured run telemetry</div>
               <div className="scenario-metrics-bar">
                 <div className="metric-box">
                   <small>Cold Start</small>
@@ -140,7 +141,7 @@ export default function EvaluatorTourBanner({ onLoadScenario }: EvaluatorTourBan
               </div>
 
               <div className="scenario-log-preview">
-                <small>Authentic Android Logcat Telemetry:</small>
+                <small>Scenario fixture logcat (illustrative, not live device evidence):</small>
                 <pre>{selectedScenario.logcat.slice(0, 400)}...</pre>
               </div>
             </div>

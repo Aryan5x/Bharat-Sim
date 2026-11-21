@@ -11,7 +11,9 @@ import {
   FileSearch,
   FlaskConical,
   LoaderCircle,
+  Moon,
   RefreshCw,
+  Sun,
   ShieldCheck,
   Smartphone,
   X
@@ -61,6 +63,9 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const previewMode = isDemoMode();
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    document.documentElement.dataset.theme === "light" ? "light" : "dark"
+  );
 
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");

@@ -519,19 +519,21 @@ export type EvaluatorScenario = {
 };
 
 export type SarvamAudioResponse = {
-  audio_content: string; // base64 WAV
-  content_type: string;
+  audio_base64: string;
+  format: string;
   language_code: string;
-  char_count: number;
+  speaker: string;
+  is_fixture: boolean;
+  note?: string;
 };
 
 export type AnomalyDetail = {
   metric: string;
-  baseline: number;
-  constrained: number;
+  baseline: number | string;
+  constrained: number | string;
   delta_pct: number;
-  z_score: number;
   status: "severe_anomaly" | "elevated" | "normal";
+  explanation?: string;
 };
 
 export type ComparisonResult = {
@@ -548,8 +550,8 @@ export type ComparisonResult = {
 };
 
 export async function fetchEvaluatorScenarios(): Promise<EvaluatorScenario[]> {
-  const res = await api<{ scenarios: EvaluatorScenario[] }>("/api/v1/evaluator/scenarios");
-  return res.scenarios;
+  const res = await api<{ items: EvaluatorScenario[] }>("/api/v1/evaluator/scenarios");
+  return res.items;
 }
 
 export async function fetchEvaluatorScenario(id: string): Promise<EvaluatorScenario> {
