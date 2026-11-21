@@ -311,6 +311,11 @@ app.add_middleware(
 )
 
 SUPABASE_ORIGIN = SUPABASE_URL or "https://*.supabase.co"
+# Resumable (TUS) APK uploads go to the project's dedicated storage host.
+SUPABASE_STORAGE_ORIGIN = (
+    SUPABASE_URL.removesuffix(".supabase.co") + ".storage.supabase.co"
+    if SUPABASE_URL.endswith(".supabase.co") else ""
+)
 CONTENT_SECURITY_POLICY = "; ".join([
     "default-src 'self'",
     "script-src 'self'",
@@ -318,7 +323,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "media-src 'self' blob: data:",
-    f"connect-src 'self' {SUPABASE_ORIGIN}",
+    f"connect-src 'self' {SUPABASE_ORIGIN} {SUPABASE_STORAGE_ORIGIN}".strip(),
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
