@@ -916,7 +916,7 @@ export default function App() {
               <span className="footer-divider" /> Android resilience testing · evidence-first diagnostics.
             </span>
             <span>
-              Evidence over assumptions <span className="footer-green">●</span>
+              Evidence over assumptions <span className="footer-green" style={{ color: "#7667F8" }}>●</span>
             </span>
           </footer>
         </div>

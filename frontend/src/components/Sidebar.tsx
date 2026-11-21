@@ -41,13 +41,14 @@ export default function Sidebar({
   const { theme, toggleTheme } = useTheme();
   const session = readSession();
   const onlineWorkers = workers.filter((w) => w.online);
+  const isOnline = onlineWorkers.length > 0;
 
   return (
-    <aside className={"sidebar " + (collapsed ? "collapsed" : "")}>
+    <aside className={"sidebar page-enter " + (collapsed ? "collapsed" : "")}>
       {/* Brand Header */}
       <div className="brand">
         <div className="brand-mark">
-          <span>B</span>
+          <span style={{ background: "linear-gradient(135deg, #7667F8, #9A8BFF)" }}>B</span>
         </div>
         {!collapsed && (
           <div className="brand-copy">
@@ -183,22 +184,28 @@ export default function Sidebar({
         {!collapsed && (
           <div className="worker-card">
             <span
-              className={
-                "pulse-dot " + (onlineWorkers.length > 0 ? "worker-online" : "")
-              }
+              className={"pulse-dot " + (isOnline ? "worker-online" : "")}
+              style={{ color: isOnline ? "#36C995" : "#4A5570" }}
             />
             <div>
               <b>Android Worker</b>
               <small>
                 {previewMode
                   ? "Operational"
-                  : onlineWorkers.length > 0
+                  : isOnline
                   ? `${onlineWorkers.length} heartbeat(s)`
                   : "No recent heartbeat"}
               </small>
             </div>
-            <span className="status-pill">
-              {onlineWorkers.length > 0 ? "ONLINE" : "OFFLINE"}
+            <span
+              className="status-pill"
+              style={
+                isOnline
+                  ? { background: "rgba(54,201,149,0.1)", color: "#36C995", border: "1px solid rgba(54,201,149,0.3)" }
+                  : { background: "rgba(74,85,112,0.15)", color: "#727F98", border: "1px solid rgba(74,85,112,0.3)" }
+              }
+            >
+              {isOnline ? "ONLINE" : "OFFLINE"}
             </span>
           </div>
         )}
@@ -230,4 +237,3 @@ export default function Sidebar({
     </aside>
   );
 }
-

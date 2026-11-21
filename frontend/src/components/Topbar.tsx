@@ -35,6 +35,13 @@ export default function Topbar({
     settings: "Workspace Settings"
   };
 
+  const apiStatusStyle =
+    apiStatus === "online"
+      ? { background: "rgba(54,201,149,0.1)", color: "#36C995", border: "1px solid rgba(54,201,149,0.25)" }
+      : apiStatus === "offline"
+      ? { background: "rgba(241,109,120,0.1)", color: "#F16D78", border: "1px solid rgba(241,109,120,0.25)" }
+      : { background: "rgba(118,103,248,0.1)", color: "#7667F8", border: "1px solid rgba(118,103,248,0.25)" };
+
   return (
     <header className="topbar">
       <div className="breadcrumbs">
@@ -45,7 +52,7 @@ export default function Topbar({
         >
           Workspace
         </button>
-        <ChevronRight size={13} />
+        <ChevronRight size={13} className="breadcrumb-sep" />
         {runId ? (
           <>
             <button
@@ -55,7 +62,7 @@ export default function Topbar({
             >
               Test Runs
             </button>
-            <ChevronRight size={13} />
+            <ChevronRight size={13} className="breadcrumb-sep" />
             <b className="breadcrumb-current">Run {runId.slice(0, 8)}</b>
           </>
         ) : (
@@ -64,24 +71,42 @@ export default function Topbar({
       </div>
 
       <div className="top-actions">
-        <a className="api-docs-link" href="https://github.com/kaustubhdua/Bharat-Sim#readme" target="_blank" rel="noreferrer" aria-label="Project documentation on GitHub">
+        <a
+          className="api-docs-link"
+          href="https://github.com/kaustubhdua/Bharat-Sim#readme"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Project documentation on GitHub"
+        >
           Docs
         </a>
+
         {/* Evaluator Quick Tour Shortcut Button */}
         <button
           type="button"
           className="evaluator-quick-tour-btn"
           onClick={onOpenEvaluatorTour}
           title="Open Evaluator Quick Tour with 2 preloaded scenarios"
+          style={{ color: "#7667F8" }}
         >
-          <Zap size={14} />
+          <Zap size={14} style={{ color: "#7667F8" }} />
           <span>Evaluator Tour</span>
         </button>
 
         {/* API Status Pill */}
-        <span className={"api-state " + apiStatus}>
+        <span
+          className={"api-state " + apiStatus}
+          style={apiStatusStyle}
+        >
           <span />
-          <span>API {apiStatus === "online" ? "Connected" : apiStatus === "offline" ? "Unavailable" : "Checking"}</span>
+          <span>
+            API{" "}
+            {apiStatus === "online"
+              ? "Connected"
+              : apiStatus === "offline"
+              ? "Unavailable"
+              : "Checking"}
+          </span>
         </span>
 
         {/* Refresh button */}
@@ -97,11 +122,14 @@ export default function Topbar({
         </button>
 
         {/* User / Workspace Badge */}
-        <div className="avatar" title="BharatSim Active Workspace">
+        <div
+          className="avatar"
+          title="BharatSim Active Workspace"
+          style={{ background: "linear-gradient(135deg, #7667F8, #9A8BFF)" }}
+        >
           BS
         </div>
       </div>
     </header>
   );
 }
-

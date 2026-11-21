@@ -42,9 +42,9 @@ export const ParticleField: React.FC<{ className?: string }> = ({ className = ""
     let raf = 0;
 
     const colors = {
-      emerald: "16, 185, 129",
-      mint: "52, 211, 153",
-      cyan: "45, 212, 191",
+      emerald: "118, 103, 248",
+      mint: "154, 139, 255",
+      cyan: "196, 186, 255",
     };
 
     const makeParticle = (): Particle => {
@@ -103,7 +103,7 @@ export const ParticleField: React.FC<{ className?: string }> = ({ className = ""
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < maxDist) {
             const alpha = (1 - dist / maxDist) * 0.12;
-            ctx.strokeStyle = `rgba(16, 185, 129, ${alpha})`;
+            ctx.strokeStyle = `rgba(118, 103, 248, ${alpha})`;
             ctx.lineWidth = 0.6;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);

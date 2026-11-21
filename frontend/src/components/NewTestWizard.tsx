@@ -129,7 +129,7 @@ export default function NewTestWizard({
   };
 
   return (
-    <div className="panel full-panel wizard-panel">
+    <div className="panel full-panel wizard-panel page-enter">
       <div className="panel-heading">
         <div>
           <div className="section-kicker">STEP-BY-STEP TEST SETUP</div>
