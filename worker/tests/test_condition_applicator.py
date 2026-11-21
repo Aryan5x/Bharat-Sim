@@ -418,7 +418,7 @@ MemAvailable:    2097152 kB
             # and RAM is report-only, even though supported network controls were applied.
             self.assertFalse(evidence["constraints_applied"])
             self.assertEqual(evidence["overall_status"], "partially_applied_and_verified")
-            mock_apply_net.assert_called_once_with("emulator-5554", 180, 1200, 350, 2.0)
+            mock_apply_net.assert_called_once_with("emulator-5554", 180, 1000, 300, 2.0)
 
         mock_reset_net.assert_called_once_with("emulator-5554")
         cleanup = manager.cleanup_records

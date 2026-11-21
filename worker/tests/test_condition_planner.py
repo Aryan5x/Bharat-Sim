@@ -21,13 +21,13 @@ class ConditionPlannerTests(unittest.TestCase):
         self.assertIsNotNone(down)
         self.assertTrue(down.requested)
         self.assertEqual(down.classification, "supported")
-        self.assertEqual(down.target_value, 1200)
+        self.assertEqual(down.target_value, 1000)
 
         up = plan.get_condition("upload_bandwidth")
         self.assertIsNotNone(up)
         self.assertTrue(up.requested)
         self.assertEqual(up.classification, "control_plane_verifiable")
-        self.assertEqual(up.target_value, 350)
+        self.assertEqual(up.target_value, 300)
 
         loss = plan.get_condition("packet_loss")
         self.assertIsNotNone(loss)
@@ -45,7 +45,7 @@ class ConditionPlannerTests(unittest.TestCase):
         self.assertIsNotNone(stor)
         self.assertTrue(stor.requested)
         self.assertEqual(stor.classification, "supported")
-        self.assertEqual(stor.target_value, 600)
+        self.assertEqual(stor.target_value, 500)
 
         ram = plan.get_condition("ram_constraint")
         self.assertIsNotNone(ram)

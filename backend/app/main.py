@@ -2087,7 +2087,7 @@ def compare_runs(payload: CompareRunsRequest, request: Request):
         if isinstance(value, (int, float)):
             return float(value)
         if isinstance(value, str):
-            match = re.match(r"^\\s*(-?\\d+(?:\\.\\d+)?)", value)
+            match = re.match(r"^\s*(-?\d+(?:\.\d+)?)", value)
             return float(match.group(1)) if match else None
         return None
 

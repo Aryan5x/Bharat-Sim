@@ -25,6 +25,7 @@ class RunnerEntrypointTests(unittest.TestCase):
         completed = subprocess.run(
             [sys.executable, str(repo_root / "worker" / "runner.py"), "--help"],
             cwd=repo_root, capture_output=True, text=True, timeout=10, check=False,
+            stdin=subprocess.DEVNULL,
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("Bounded local APK smoke runner", completed.stdout)
@@ -324,7 +325,7 @@ class RunnerConditionEvidenceTests(unittest.TestCase):
                     return CompletedProcess(args=args, returncode=0, stdout="Success\n", stderr="")
                 return CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
-            with patch.dict(os.environ, {"BHARATSIM_ENABLE_LOCAL_APK_EXECUTION": "true", "ANDROID_SERIAL": "emulator-5554"}), \
+            with patch.dict(os.environ, {"BHARATSIM_ENABLE_LOCAL_APK_EXECUTION": "true", "ANDROID_SERIAL": "emulator-5554", "PYTHON_COLORS": "0"}), \
                  patch("shutil.which", return_value="/bin/tool"), \
                  patch("time.sleep", return_value=None), \
                  patch("worker.runner.run_cmd", side_effect=mock_cmd), \
@@ -401,7 +402,7 @@ class RunnerConditionEvidenceTests(unittest.TestCase):
                     return CompletedProcess(args=args, returncode=0, stdout="Success\n", stderr="")
                 return CompletedProcess(args=args, returncode=0, stdout="", stderr="")
 
-            with patch.dict(os.environ, {"BHARATSIM_ENABLE_LOCAL_APK_EXECUTION": "true", "ANDROID_SERIAL": "emulator-5554"}), \
+            with patch.dict(os.environ, {"BHARATSIM_ENABLE_LOCAL_APK_EXECUTION": "true", "ANDROID_SERIAL": "emulator-5554", "PYTHON_COLORS": "0"}), \
                  patch("shutil.which", return_value="/bin/tool"), \
                  patch("time.sleep", return_value=None), \
                  patch("worker.runner.run_cmd", side_effect=mock_cmd), \

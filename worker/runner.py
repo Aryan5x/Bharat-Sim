@@ -276,7 +276,8 @@ def reset_emulator_network_profile(serial: str) -> dict[str, object]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser_kwargs = {"color": False} if sys.version_info >= (3, 14) else {}
+    parser = argparse.ArgumentParser(description=__doc__, **parser_kwargs)
     parser.add_argument("apk", type=Path)
     parser.add_argument("--duration", type=int, default=20, help="seconds to observe the launched app (1–120)")
     parser.add_argument("--persona-profile", type=Path, help="path to JSON file containing full persona profile definition")

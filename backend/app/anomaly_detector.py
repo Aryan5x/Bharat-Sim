@@ -48,12 +48,15 @@ def detect_regressions(
             - 'summary': executive summary string
     """
     anomalies: list[dict[str, Any]] = []
+    start_delta: float = 0.0
+    mem_delta: float = 0.0
 
     # 1. Cold start launch latency regression
     b_start = baseline.get("cold_start_ms")
     c_start = constrained.get("cold_start_ms")
     if isinstance(b_start, (int, float)) and isinstance(c_start, (int, float)):
         delta = c_start - b_start
+        start_delta = float(delta)
         pct_increase = round((delta / b_start) * 100, 1) if b_start > 0 else 0
         severity = None
         if delta >= REGRESSION_THRESHOLDS["cold_start_ms"]["critical_delta_ms"]:
@@ -128,14 +131,15 @@ def detect_regressions(
 
     # 4. Multivariate reference z-score heuristic
     feature_row = [
-        float(delta) if 'delta' in locals() and delta is not None else 0.0,
+        start_delta,
         float(c_jank) if isinstance(c_jank, (int, float)) else 0.0,
-        float(mem_delta) if 'mem_delta' in locals() and mem_delta is not None else 0.0,
+        mem_delta,
     ]
 
     is_anomalous, anomaly_score = _calculate_statistical_anomaly_score(feature_row)
     if not anomalies:
         is_anomalous = False
+        anomaly_score = 0.0
 
     summary = (
         f"{len(anomalies)} performance regression(s) identified between baseline and constrained environment."
