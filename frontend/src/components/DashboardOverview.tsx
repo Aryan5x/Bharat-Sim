@@ -60,14 +60,14 @@ export default function DashboardOverview({
     : "Run a test or analyse a log to get a score";
 
   return (
-    <div className="dashboard-overview-container relative overflow-hidden" style={{ position: "relative" }}>
-      <Spotlight fill="#10b981" />
+    <div className="dashboard-overview-container page-enter relative overflow-hidden" style={{ position: "relative" }}>
+      <Spotlight fill="#7667F8" />
       {/* Evaluator Quick Tour Banner */}
       <EvaluatorTourBanner onLoadScenario={onLoadScenario} />
 
       {/* KPI Cards Row */}
-      <section className="metric-grid">
-        <div className="metric-card">
+      <section className="metric-grid stagger-child-container">
+        <div className="metric-card stagger-child">
           <div className="metric-heading">
             TEST PROFILES <Smartphone size={16} />
           </div>
@@ -83,7 +83,7 @@ export default function DashboardOverview({
           </div>
         </div>
 
-        <div className="metric-card">
+        <div className="metric-card stagger-child">
           <div className="metric-heading">
             TEST EXECUTIONS <FlaskConical size={16} />
           </div>
@@ -97,7 +97,7 @@ export default function DashboardOverview({
           </div>
         </div>
 
-        <div className="metric-card">
+        <div className="metric-card stagger-child">
           <div className="metric-heading">
             ACTIVE WORKERS <Activity size={16} />
           </div>
@@ -111,7 +111,7 @@ export default function DashboardOverview({
           </div>
         </div>
 
-        <div className="metric-card score-card">
+        <div className="metric-card score-card stagger-child">
           <div className="metric-heading">
             BHARATSCORE <Gauge size={16} />
           </div>

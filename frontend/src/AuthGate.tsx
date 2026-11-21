@@ -97,7 +97,7 @@ export default function AuthGate({ children }: { children: ReactNode }) {
   if (!session) return (
     <main className="auth-screen">
       <section className="auth-card">
-        <div className="auth-brand"><span><Activity size={22} /></span><div><b>BharatSim</b><small>THE CHEAP PHONE TEST</small></div></div>
+        <div className="auth-brand"><span style={{ background: "linear-gradient(135deg, #7667F8, #9A8BFF)", borderRadius: "8px", display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "6px", color: "#F5F6FC" }}><Activity size={22} /></span><div><b>BharatSim</b><small>THE CHEAP PHONE TEST</small></div></div>
         <div className="auth-eyebrow"><ShieldCheck size={14} /> SECURE WORKSPACE</div>
         <h1>{signupMode ? "Create your workspace access." : "Welcome back."}</h1>
         <p className="auth-copy">Sign in to access your Android resilience runs and private analysis reports.</p>

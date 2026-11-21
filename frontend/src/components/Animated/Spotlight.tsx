@@ -7,7 +7,7 @@ interface SpotlightProps {
 
 export const Spotlight: React.FC<SpotlightProps> = ({
   className = "",
-  fill = "#10b981",
+  fill = "#7667F8",
 }) => {
   // The glow is larger than its container; the wrapper clips it so it never widens the page.
   return (

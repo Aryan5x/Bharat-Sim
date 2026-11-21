@@ -29,7 +29,7 @@ export default function SettingsView({ capabilities, apiStatus }: SettingsViewPr
   };
 
   return (
-    <div className="panel full-panel settings-panel">
+    <div className="panel full-panel settings-panel page-enter">
       <div className="panel-heading">
         <div>
           <div className="section-kicker">PREFERENCES & CONFIGURATION</div>

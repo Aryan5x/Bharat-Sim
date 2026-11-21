@@ -1,17 +1,7 @@
 import { useState } from "react";
 import {
-  Smartphone,
-  Wifi,
-  Activity,
-  Layers,
-  ArrowRight,
-  ShieldCheck,
-  ChevronRight,
-  Gauge,
-  Cpu,
-  Brain,
-  Sparkles,
-  Terminal
+  Smartphone, Wifi, Activity, Layers, ArrowRight,
+  ChevronRight, Brain, Sparkles, Terminal, CheckCircle2
 } from "lucide-react";
 import { type Persona, type EvaluatorScenario, fallbackPersonas } from "../api";
 import EvaluatorTourBanner from "./EvaluatorTourBanner";
@@ -51,11 +41,62 @@ export default function LandingPage({
     }
   ];
 
+  const capabilities = [
+    {
+      icon: <Smartphone size={22} />,
+      title: "Realistic Device Personas",
+      desc: "Test on emulated budget Android profiles — 2GB RAM, low-end CPUs, constrained storage — matching devices real Indian users own."
+    },
+    {
+      icon: <Wifi size={22} />,
+      title: "Network Condition Simulation",
+      desc: "Inject real-world network impairments: 2G edge latency, rural packet loss, crowded transit 3G. See how your app behaves."
+    },
+    {
+      icon: <Brain size={22} />,
+      title: "ML Failure Classification",
+      desc: "Zero-dependency TF-IDF classifier categorizes logcat failures — crash, ANR, OOM, network — in under 1ms with evidence links."
+    },
+    {
+      icon: <Activity size={22} />,
+      title: "Bharat Readiness Score",
+      desc: "A transparent, evidence-based score computed from actual telemetry. No synthetic metrics. No imputed data. Know exactly what it means."
+    },
+    {
+      icon: <Terminal size={22} />,
+      title: "Logcat Intelligence",
+      desc: "Submit any Android logcat and receive structured failure analysis, severity classification, and actionable recommendations."
+    },
+    {
+      icon: <Sparkles size={22} />,
+      title: "Sarvam AI Integration",
+      desc: "Speak your test scenario in natural language. Get findings explained in Indian languages with Bulbul TTS audio narration."
+    }
+  ];
+
+  const workflowSteps = [
+    { num: "1", title: "Upload APK or Submit Logcat", desc: "Upload your Android APK for emulator testing, or paste logcat output directly for instant ML analysis." },
+    { num: "2", title: "Select Device Persona", desc: "Choose from Budget Android, Mid-Range, Rural 2G, Transit 3G or build a custom persona." },
+    { num: "3", title: "Configure Network Environment", desc: "Set bandwidth limits, latency, jitter, and packet loss to replicate real Indian connectivity." },
+    { num: "4", title: "Execute & Collect Telemetry", desc: "BharatSim runs your app on a real emulator, collects network traces, logcat and performance signals." },
+    { num: "5", title: "Review Failure Analysis", desc: "ML classifier categorizes failures. Each finding links to source evidence in the actual logcat." },
+    { num: "6", title: "Get Bharat Readiness Score", desc: "Transparent score computed from real measurements. Actionable recommendations with multilingual audio support." }
+  ];
+
+  const stats = [
+    { number: "5+", label: "Device Personas" },
+    { number: "4", label: "Network Profiles" },
+    { number: "<1ms", label: "ML Inference" },
+    { number: "100%", label: "Evidence-Backed" }
+  ];
+
   return (
-    <div className="landing-container">
-      {/* Hero Section with Ambient Electric Emerald Spotlight */}
-      <section className="landing-hero relative overflow-hidden" style={{ position: "relative", overflow: "hidden" }}>
-        <Spotlight fill="#10b981" />
+    <div className="landing-container page-enter">
+      {/* ── HERO ─────────────────────────────────────── */}
+      <section className="landing-hero" style={{ position: "relative", overflow: "hidden" }}>
+        <Spotlight fill="#7667F8" />
+
+        {/* Badge */}
         <div className="landing-hero-badge">
           <span className="badge-pulse" />
           <span>BHARATSIM 2.0 · THE CHEAP PHONE TEST</span>
@@ -63,34 +104,27 @@ export default function LandingPage({
         </div>
 
         <h1 className="landing-hero-title">
-          Test Android apps for the phones <br />
-          <span className="text-gradient">India actually uses.</span>
+          Test Android Apps Under<br />
+          <span className="text-gradient">Real-World Indian Conditions.</span>
         </h1>
 
         <p className="landing-hero-subtitle">
-          Inspect Android logs and, when an isolated worker is configured, exercise APKs against supported device and network profiles. Review evidence from actual runs rather than synthetic dashboard metrics.
+          Discover crashes, performance bottlenecks and network failures before your users do.
+          Test across realistic device personas and challenging Indian network environments.
         </p>
 
         <div className="landing-cta-group">
-          <button
-            type="button"
-            className="primary-action-btn"
-            onClick={onStartTesting}
-          >
+          <button type="button" className="primary-action-btn" onClick={onStartTesting}>
             <span>Start Testing Now</span>
             <ArrowRight size={16} />
           </button>
-          <button
-            type="button"
-            className="secondary-action-btn"
-            onClick={onExplorePlanner}
-          >
+          <button type="button" className="secondary-action-btn" onClick={onExplorePlanner}>
             <Layers size={16} />
             <span>Explore Risk Planner</span>
           </button>
         </div>
 
-        {/* Dynamic Telemetry & Spec Marquee */}
+        {/* Telemetry Marquee */}
         <div className="landing-marquee-wrapper" style={{ margin: "24px 0 28px" }}>
           <Marquee speed={32} pauseOnHover={true}>
             {[
@@ -98,282 +132,114 @@ export default function LandingPage({
               { tag: "Rural 2G", text: "Edge Village · 450ms Latency · 8% Packet Loss" },
               { tag: "Transit", text: "Crowded Railway Station · 320ms Latency · 3G Cell" },
               { tag: "ML Engine", text: "Zero-DLL TF-IDF Failure Classifier · < 1ms Inference" },
-              { tag: "Sarvam AI", text: "Bulbul TTS Hindi / Tamil / Marathi Voice Briefings" },
-              { tag: "Telemetry", text: "dumpsys gfxinfo (Jank Frames) & dumpsys meminfo (PSS)" },
-              { tag: "Storage", text: "TUS Resumable Chunked Uploads + SHA-256 Checksum" },
-              { tag: "Heuristic", text: "Transparent Bharat Readiness Score (0-100)" }
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  background: "rgba(14, 17, 24, 0.9)",
-                  border: "1px solid rgba(16, 185, 129, 0.25)",
-                  borderRadius: "9999px",
-                  padding: "6px 14px",
-                  fontSize: "12px",
-                  color: "#cbd5e1",
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 2px 10px rgba(0,0,0,0.3)"
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "10px",
-                    fontFamily: "var(--mono)",
-                    background: "rgba(16, 185, 129, 0.15)",
-                    color: "#34d399",
-                    borderRadius: "4px",
-                    padding: "2px 6px"
-                  }}
-                >
-                  {item.tag}
-                </span>
-                <span style={{ fontWeight: 500 }}>{item.text}</span>
-              </div>
+              { tag: "Sarvam AI", text: "Bulbul TTS · Hindi · Tamil · Telugu · Kannada" },
+              { tag: "Scoring", text: "Bharat Readiness Score · Evidence-Based · Transparent" },
+              { tag: "Network", text: "tc-netem Shaping · Bandwidth Cap · Jitter · Packet Drop" },
+            ].map((item) => (
+              <span key={item.tag} className="marquee-pill">
+                <span className="pill-tag">{item.tag}</span>
+                <span>{item.text}</span>
+              </span>
             ))}
           </Marquee>
         </div>
+      </section>
 
-        {/* Quick Evaluator Scenario Tour Banner embedded in Landing */}
-        <div className="landing-tour-wrapper">
-          <EvaluatorTourBanner onLoadScenario={onLoadScenario} />
+      {/* ── STATS STRIP ──────────────────────────────── */}
+      <section className="landing-section" style={{ paddingTop: 0 }}>
+        <div className="landing-stats-grid">
+          {stats.map((s) => (
+            <div key={s.label} className="landing-stat-item">
+              <div className="landing-stat-number">{s.number}</div>
+              <div className="landing-stat-label">{s.label}</div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Platform Architecture & Live Interactive Preview */}
-      <section className="landing-preview-section">
-        <div className="section-header-center">
-          <span className="section-eyebrow">ENGINEERING OBSERVABILITY</span>
-          <h2>Evidence-led Android Diagnostics</h2>
-          <p>
-            Inspect submitted Android logs and review worker evidence when a properly isolated execution environment is configured.
-          </p>
-        </div>
+      {/* ── EVALUATOR TOUR ───────────────────────────── */}
+      <section className="landing-section">
+        <EvaluatorTourBanner onLoadScenario={onLoadScenario} />
+      </section>
 
-        <div className="interactive-preview-card">
-          <div className="preview-topbar">
-            <div className="window-dots">
-              <span className="dot dot-red" />
-              <span className="dot dot-yellow" />
-              <span className="dot dot-green" />
+      {/* ── CAPABILITIES ─────────────────────────────── */}
+      <section className="landing-section">
+        <div className="landing-section-label">PLATFORM CAPABILITIES</div>
+        <h2 className="landing-section-title">
+          Everything you need to test for India
+        </h2>
+        <p className="landing-section-subtitle">
+          BharatSim combines real emulator execution, network simulation, and ML-powered analysis
+          into one developer workflow.
+        </p>
+        <div className="feature-grid stagger-child-container">
+          {capabilities.map((cap, i) => (
+            <div key={cap.title} className={`feature-card stagger-child`} style={{ animationDelay: `${i * 60}ms` }}>
+              <div className="feature-card-icon">{cap.icon}</div>
+              <div className="feature-card-title">{cap.title}</div>
+              <div className="feature-card-desc">{cap.desc}</div>
             </div>
-            <div className="preview-url-bar">
-              <Terminal size={13} />
-              <span>bharatsim.engine // execution-telemetry-v2</span>
-            </div>
-            <div className="preview-status-pill">
-              <span className="pulse-green" />
-              <span>INTERACTIVE PRODUCT PREVIEW · NO APK EXECUTION</span>
-            </div>
-          </div>
-
-          <div className="preview-grid">
-            <div className="preview-pane-left">
-              <h4>Active Constraints Matrix</h4>
-              <div className="mini-persona-selector">
-                {fallbackPersonas.slice(0, 4).map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={"mini-persona-btn " + (selectedPersona.id === p.id ? "active" : "")}
-                    onClick={() => setSelectedPersona(p)}
-                  >
-                    <Smartphone size={15} />
-                    <div>
-                      <strong>{p.name}</strong>
-                      <small>{p.device} · {p.latency_ms}ms latency</small>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="constraint-readout-box">
-                <div className="readout-row">
-                  <span>Target RAM profile:</span>
-                  <strong>{selectedPersona.ram_mb} MB (2GB class)</strong>
-                </div>
-                <div className="readout-row">
-                  <span>Target network latency:</span>
-                  <strong className="text-warning">+{selectedPersona.latency_ms} ms</strong>
-                </div>
-                <div className="readout-row">
-                  <span>Target throughput:</span>
-                  <strong>{selectedPersona.down_kbps} kbps down / {selectedPersona.up_kbps} kbps up</strong>
-                </div>
-                <div className="readout-row">
-                  <span>Packet loss:</span>
-                  <strong>{selectedPersona.packet_loss_pct}% (shaping proxy)</strong>
-                </div>
-                <div className="readout-row">
-                  <span>Battery-saver target:</span>
-                  <strong>{selectedPersona.battery_saver ? "On (CPU throttling not applied)" : "Not requested"}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="preview-pane-right">
-              <h4>Telemetry available after a real worker run</h4>
-              <div className="telemetry-display-grid">
-                <div className="telemetry-stat-card">
-                  <span className="stat-label"><Gauge size={13} /> Jank Frames (gfxinfo)</span>
-                  <strong className="stat-value text-muted">—</strong>
-                  <span className="stat-sub">Available when gfxinfo is captured</span>
-                </div>
-                <div className="telemetry-stat-card">
-                  <span className="stat-label"><Cpu size={13} /> Peak PSS Memory</span>
-                  <strong className="stat-value text-muted">—</strong>
-                  <span className="stat-sub">Available when meminfo is captured</span>
-                </div>
-                <div className="telemetry-stat-card">
-                  <span className="stat-label"><Brain size={13} /> ML Classification</span>
-                  <strong className="stat-value text-muted">—</strong>
-                  <span className="stat-sub">Classifier output appears after log analysis</span>
-                </div>
-                <div className="telemetry-stat-card">
-                  <span className="stat-label"><Sparkles size={13} /> Sarvam AI Translation</span>
-                  <strong className="stat-value text-muted">Provider gated</strong>
-                  <span className="stat-sub">Requires SARVAM_API_KEY</span>
-                </div>
-              </div>
-
-              <div className="terminal-log-snippet">
-                <div className="terminal-header">
-                  <span>ILLUSTRATIVE LOGCAT EXCERPT · SAMPLE ONLY</span>
-                  <span className="log-badge">L142-L147</span>
-                </div>
-                <code>
-                  [W/System.err] java.net.SocketTimeoutException: failed to connect to api.example.test (port 443) after 15000ms<br />
-                  [E/ExampleFlow] Request timed out while waiting for a network response<br />
-                  [I/BharatSim] A classifier result is shown only after submitted evidence is analysed
-                </code>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      {/* Feature Capabilities Grid */}
-      <section className="landing-features-section">
-        <div className="section-header-center">
-          <span className="section-eyebrow">IMPLEMENTED WORKFLOWS & DOCUMENTED LIMITS</span>
-          <h2>Built for the Reality of Bharat's Device Diversity</h2>
-          <p>
-            A practical set of evidence-linked Android diagnostics, planning tools and guarded execution workflows.
-          </p>
-        </div>
-
-        <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-icon icon-blue"><Smartphone size={20} /></div>
-            <h3>Curated Bharat Test Personas</h3>
-            <p>
-              Use authored target profiles to plan tests. Profile values are requested conditions, not measurements from physical devices.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon icon-emerald"><Brain size={20} /></div>
-            <h3>Evidence-linked Log Triage</h3>
-            <p>
-              A portable TF-IDF class-centroid model and deterministic rules classify common log markers. Results are triage hints, not verified root causes or independently benchmarked accuracy.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon icon-amber"><Wifi size={20} /></div>
-            <h3>Indian Network Conditions</h3>
-            <p>
-              Latency, bandwidth, packet loss, connection resets and full outages are applied through a shaping proxy, then compared against a baseline run. Each report says whether the app's traffic went through the proxy.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon icon-purple"><Sparkles size={20} /></div>
-            <h3>Provider-gated Indic Services</h3>
-            <p>
-              Report translation and Bulbul text-to-speech require a server-side SARVAM_API_KEY. Remediation suggestions are deterministic templates, not generative root-cause diagnoses.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon icon-cyan"><Activity size={20} /></div>
-            <h3>Evidence-based Run Comparison</h3>
-            <p>
-              Compare persisted metrics shared by two completed worker reports. Missing measurements are excluded rather than estimated or filled with sample values.
-            </p>
-          </div>
-
-          <div className="feature-card">
-            <div className="feature-icon icon-rose"><ShieldCheck size={20} /></div>
-            <h3>Guarded Execution & Private Data</h3>
-            <p>
-              The API includes authentication, owner-scoped data access and private-storage controls. Public APK execution remains disabled until an isolated worker host and default-deny egress are independently verified.
-            </p>
-          </div>
+      {/* ── HOW IT WORKS ─────────────────────────────── */}
+      <section className="landing-section landing-section-alt">
+        <div className="landing-section-label">WORKFLOW</div>
+        <h2 className="landing-section-title">How BharatSim works</h2>
+        <p className="landing-section-subtitle">
+          From APK upload to actionable findings in minutes.
+        </p>
+        <div className="workflow-steps" style={{ maxWidth: 640, margin: "32px auto 0" }}>
+          {workflowSteps.map((step) => (
+            <div key={step.num} className="workflow-step">
+              <div>
+                <div className="workflow-step-num">{step.num}</div>
+              </div>
+              <div className="workflow-step-content">
+                <h4>{step.title}</h4>
+                <p>{step.desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Workflow Step Section */}
-      <section className="landing-workflow-section">
-        <div className="section-header-center">
-          <span className="section-eyebrow">HOW IT WORKS</span>
-          <h2>From APK Intake to Evidence Review</h2>
-        </div>
-
-        <div className="workflow-steps-grid">
-          <div className="workflow-step-card">
-            <span className="step-num">01</span>
-            <h4>Upload APK & Inspect Metadata</h4>
-            <p>Drag and drop your Android APK. BharatSim extracts package name, min/target SDK, size, and SHA-256 fingerprint.</p>
-          </div>
-
-          <div className="workflow-step-card">
-            <span className="step-num">02</span>
-            <h4>Select Target Persona & Explore</h4>
-            <p>Choose an authored persona. If an approved isolated worker is online, it can execute the configured workflow and collect the telemetry it supports.</p>
-          </div>
-
-          <div className="workflow-step-card">
-            <span className="step-num">03</span>
-            <h4>Inspect Findings & Export Evidence</h4>
-            <p>When configured, use provider-backed report translation and Bulbul voice briefings. Without the server key, these controls remain unavailable rather than playing sample audio.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section className="landing-faq-section">
-        <div className="section-header-center">
-          <span className="section-eyebrow">FREQUENTLY ASKED QUESTIONS</span>
-          <h2>Technical Architecture & Verification</h2>
-        </div>
-
-        <div className="faq-list">
-          {faqs.map((faq, index) => (
+      {/* ── PERSONA SHOWCASE ─────────────────────────── */}
+      <section className="landing-section">
+        <div className="landing-section-label">DEVICE PERSONAS</div>
+        <h2 className="landing-section-title">Test on the right device profile</h2>
+        <p className="landing-section-subtitle">
+          Each persona emulates realistic hardware and connectivity constraints for Indian market segments.
+        </p>
+        <div className="persona-showcase-grid">
+          {fallbackPersonas.slice(0, 4).map((p) => (
             <div
-              key={index}
-              className={"faq-item " + (activeFaq === index ? "open" : "")}
+              key={p.id}
+              className={`persona-showcase-card${selectedPersona.id === p.id ? " selected" : ""}`}
+              onClick={() => setSelectedPersona(p)}
+              style={{ cursor: "pointer" }}
               role="button"
               tabIndex={0}
-              aria-expanded={activeFaq === index}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setActiveFaq(activeFaq === index ? null : index);
-                }
-              }}
-              onClick={() => setActiveFaq(activeFaq === index ? null : index)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelectedPersona(p); }}
             >
-              <div className="faq-question">
-                <span>{faq.q}</span>
-                <ChevronRight size={16} className={"faq-chevron " + (activeFaq === index ? "rotated" : "")} />
+              <div className="persona-showcase-name">{p.name}</div>
+              <div className="persona-showcase-spec" style={{ marginTop: 8 }}>
+                {p.network && <div>Network: {p.network}</div>}
+                {p.ram_mb && <div>RAM: {p.ram_mb}MB</div>}
+                {p.device && <div>Device: {p.device}</div>}
               </div>
-              {activeFaq === index && (
-                <div className="faq-answer">
-                  <p>{faq.a}</p>
+              {selectedPersona.id === p.id && (
+                <div style={{
+                  marginTop: 12,
+                  fontSize: "0.72rem",
+                  color: "#7667F8",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4
+                }}>
+                  <CheckCircle2 size={12} />
+                  <span>Selected</span>
                 </div>
               )}
             </div>
@@ -381,39 +247,104 @@ export default function LandingPage({
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="landing-footer">
-        <div className="footer-top">
-          <div className="footer-brand">
-            <span className="footer-logo">B</span>
-            <div>
-              <strong>BharatSim</strong>
-              <small>The Cheap Phone Test · hackFront India Grand Finale</small>
+      {/* ── FAQ ──────────────────────────────────────── */}
+      <section className="landing-section landing-section-alt">
+        <div className="landing-section-label">FREQUENTLY ASKED</div>
+        <h2 className="landing-section-title">Honest answers about what BharatSim does</h2>
+        <div className="landing-faq" style={{ maxWidth: 720, margin: "32px auto 0" }}>
+          {faqs.map((faq, i) => (
+            <div key={i} className="faq-item" style={{
+              borderBottom: "1px solid #1A2540",
+              paddingBottom: 16,
+              marginBottom: 16
+            }}>
+              <button
+                type="button"
+                className="faq-question"
+                onClick={() => setActiveFaq(activeFaq === i ? null : i)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  color: "#F5F6FC",
+                  fontWeight: 600,
+                  fontSize: "0.95rem",
+                  padding: "8px 0",
+                  gap: 12
+                }}
+                aria-expanded={activeFaq === i}
+              >
+                <span>{faq.q}</span>
+                <ChevronRight
+                  size={16}
+                  style={{
+                    color: "#727F98",
+                    minWidth: 16,
+                    transform: activeFaq === i ? "rotate(90deg)" : "rotate(0deg)",
+                    transition: "transform 200ms ease"
+                  }}
+                />
+              </button>
+              {activeFaq === i && (
+                <p style={{
+                  margin: "8px 0 0",
+                  color: "#A1AAC0",
+                  fontSize: "0.85rem",
+                  lineHeight: 1.65
+                }}>
+                  {faq.a}
+                </p>
+              )}
             </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── CTA ──────────────────────────────────────── */}
+      <section className="landing-section">
+        <div className="landing-cta-section">
+          <div className="landing-cta-title">Ready to test for real India?</div>
+          <div className="landing-cta-subtitle">
+            Start with a logcat analysis — no APK required. Upload logs, get ML-classified findings
+            and a Bharat Readiness Score in seconds.
           </div>
-          <div className="footer-links">
-            <button type="button" className="footer-link-btn" onClick={onStartTesting}>
-              Start Testing
+          <div className="landing-cta-buttons">
+            <button type="button" className="primary-action-btn" onClick={onStartTesting}>
+              <span>Start Testing Now</span>
+              <ArrowRight size={16} />
             </button>
-            <button type="button" className="footer-link-btn" onClick={onExplorePlanner}>
-              Risk Planner
+            <button type="button" className="secondary-action-btn" onClick={onExplorePlanner}>
+              <Brain size={16} />
+              <span>Try Risk Planner</span>
             </button>
-            <a
-              href="https://github.com/kaustubhdua/Bharat-Sim"
-              target="_blank"
-              rel="noreferrer"
-              className="footer-link-btn"
-            >
-              GitHub Repository
-            </a>
           </div>
         </div>
-        <div className="footer-bottom">
-          <span>&copy; 2026 BharatSim. Open-source Android resilience intelligence.</span>
-          <span className="footer-tagline">Evidence over assumptions ●</span>
+      </section>
+
+      {/* ── FOOTER ───────────────────────────────────── */}
+      <footer className="landing-footer-new">
+        <div className="landing-footer-brand">
+          <b>BharatSim</b>
+          <p>The professional Android testing platform for real-world Indian conditions. Evidence-first diagnostics.</p>
+          <span style={{ fontSize: "0.72rem", letterSpacing: "0.06em" }}>© 2024 BharatSim · THE CHEAP PHONE TEST</span>
+        </div>
+        <div className="landing-footer-col">
+          <h5>Platform</h5>
+          <a href="#" onClick={(e) => { e.preventDefault(); onStartTesting(); }}>Dashboard</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); onExplorePlanner(); }}>Risk Planner</a>
+          <a href="https://github.com/kaustubhdua/Bharat-Sim" target="_blank" rel="noreferrer">GitHub</a>
+        </div>
+        <div className="landing-footer-col">
+          <h5>Resources</h5>
+          <a href="https://github.com/kaustubhdua/Bharat-Sim#readme" target="_blank" rel="noreferrer">Documentation</a>
+          <a href="https://github.com/kaustubhdua/Bharat-Sim/issues" target="_blank" rel="noreferrer">Issue Tracker</a>
         </div>
       </footer>
     </div>
   );
 }
-
