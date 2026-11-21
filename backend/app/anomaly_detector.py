@@ -1,6 +1,6 @@
 """Anomaly and Regression Detection comparing Baseline vs Constrained Android runs.
 
-Uses statistical variance and IsolationForest (with pure-Python fallback) to flag
+Uses explicit metric thresholds and a transparent pure-Python z-score to flag
 regressions in startup latency, UI jank, memory consumption, and network responsiveness.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ REGRESSION_THRESHOLDS = {
 }
 
 
-def _calculate_isolation_score(feature_row: list[float]) -> tuple[bool, float]:
+def _calculate_statistical_anomaly_score(feature_row: list[float]) -> tuple[bool, float]:
     """Calculate multi-variate anomaly score using statistical multivariate Z-score.
 
     Uses pure-Python statistical anomaly detection to avoid uncatchable Windows C-level
@@ -30,8 +30,8 @@ def _calculate_isolation_score(feature_row: list[float]) -> tuple[bool, float]:
     z_scores = [abs(f - m) / s for f, m, s in zip(feature_row, means, stds)]
     max_z = max(z_scores) if z_scores else 0.0
     is_anom = max_z > 2.0
-    raw_score = round(max(-1.0, min(1.0, 0.5 - (max_z * 0.25))), 4)
-    return is_anom, raw_score
+    anomaly_score = round(min(100.0, max_z * 25.0), 2)
+    return is_anom, anomaly_score
 
 
 def detect_regressions(
@@ -43,7 +43,7 @@ def detect_regressions(
     Returns:
         dict with:
             - 'anomalies': list of detected metric regressions
-            - 'anomaly_score': float (-1.0 to 1.0 from IsolationForest)
+            - 'anomaly_score': float (0.0 to 100.0 statistical heuristic)
             - 'is_anomalous': bool
             - 'summary': executive summary string
     """
@@ -126,14 +126,14 @@ def detect_regressions(
                 ),
             })
 
-    # 4. Multi-variate Anomaly Detection using IsolationForest (or statistical fallback)
+    # 4. Multivariate reference z-score heuristic
     feature_row = [
         float(delta) if 'delta' in locals() and delta is not None else 0.0,
         float(c_jank) if isinstance(c_jank, (int, float)) else 0.0,
         float(mem_delta) if 'mem_delta' in locals() and mem_delta is not None else 0.0,
     ]
 
-    is_anomalous, raw_score = _calculate_isolation_score(feature_row)
+    is_anomalous, anomaly_score = _calculate_statistical_anomaly_score(feature_row)
     if not anomalies:
         is_anomalous = False
 
@@ -146,7 +146,7 @@ def detect_regressions(
     return {
         "anomalies": anomalies,
         "is_anomalous": is_anomalous,
-        "isolation_score": round(raw_score, 4),
+        "anomaly_score": anomaly_score,
         "regression_count": len(anomalies),
         "summary": summary,
     }

@@ -13,7 +13,7 @@ export default function RunComparisonModal({
   runs,
   onClose
 }: RunComparisonModalProps) {
-  const completedRuns = runs.filter((r) => r.status === "completed" || r.id === currentRunId);
+  const completedRuns = runs.filter((r) => r.status === "completed");
   const [baselineId, setBaselineId] = useState<string>(() => {
     const base = completedRuns.find((r) => r.persona_id === "baseline");
     return base ? base.id : completedRuns[0]?.id || "";
@@ -70,7 +70,7 @@ export default function RunComparisonModal({
                 value={baselineId}
                 onChange={(e) => setBaselineId(e.target.value)}
               >
-                {runs.map((r) => (
+                {completedRuns.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.apk_name || "APK"} · {r.persona_id} ({r.id.slice(0, 8)})
                   </option>
@@ -106,7 +106,7 @@ export default function RunComparisonModal({
               onClick={() => void runComparison()}
             >
               {loading ? <LoaderCircle size={15} className="spin" /> : <GitCompare size={15} />}
-              {loading ? "Computing Covariance Anomalies…" : "Run ML Anomaly Comparison"}
+              {loading ? "Comparing measured telemetry…" : "Compare measured telemetry"}
             </button>
           </div>
 
@@ -121,7 +121,7 @@ export default function RunComparisonModal({
                 <div>
                   <h3>{result.verdict}</h3>
                   <p>{result.details}</p>
-                  <small>Multivariate statistical anomaly score: <b>{result.anomaly_score.toFixed(2)}</b> / 100</small>
+                  <small>Statistical anomaly score: <b>{result.anomaly_score.toFixed(2)}</b> / 100</small>
                 </div>
               </div>
 
@@ -148,6 +148,7 @@ export default function RunComparisonModal({
                       <TrendingUp size={12} />
                       <span>{an.delta_pct >= 0 ? `+${an.delta_pct}%` : `${an.delta_pct}%`} divergence</span>
                     </div>
+                    {an.explanation && <p className="anomaly-explanation">{an.explanation}</p>}
                   </div>
                 ))}
               </div>

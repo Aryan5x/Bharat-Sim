@@ -3,7 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b1210" />
+    <meta name="theme-color" content="#0b1020" />
+    <script>
+      (() => {
+        try {
+          const saved = localStorage.getItem("bharatsim.theme");
+          document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+        } catch {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
     <meta name="description" content="BharatSim registers Android smoke runs, analyzes logcat evidence, and verifies Android Emulator latency, bandwidth, battery saver, and bounded storage pressure on disposable emulators. RAM is report-only; packet loss and CPU throttling are unsupported." />
     <title>BharatSim — The Cheap Phone Test</title>
   </head>
