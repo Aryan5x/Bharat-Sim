@@ -68,3 +68,4 @@ export BHARATSIM_WORKER_TOKEN="your-secure-worker-token-at-least-32-chars"
 docker compose up -d
 docker logs -f bharatsim-worker-node
 ```
+

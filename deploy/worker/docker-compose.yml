@@ -21,3 +21,4 @@ services:
       - /tmp/bharatsim-artifacts:/opt/bharatsim/artifacts
     cap_add:
       - NET_ADMIN
+

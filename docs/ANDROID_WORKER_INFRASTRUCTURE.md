@@ -64,3 +64,4 @@ TasksMax=256
 - **Restricted System Access:** `ProtectSystem=strict` mounts `/usr`, `/boot`, and `/etc` as read-only.
 - **Resource Bounds:** Worker is restricted to 4 GB RAM and 300% CPU (3 cores) to prevent runaway resource exhaustion.
 - **Isolated AVD Directory:** Emulators run from `/var/lib/bharatsim/avd` with wipe-data flags (`-wipe-data -no-snapshot`) to prevent state cross-contamination between test runs.
+

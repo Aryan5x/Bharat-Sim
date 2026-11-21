@@ -14,3 +14,4 @@ echo "Android emulator is online and ready (emulator-5554)."
 
 echo "Starting BharatSim Worker Daemon..."
 exec python3 /opt/bharatsim/worker/agent.py
+

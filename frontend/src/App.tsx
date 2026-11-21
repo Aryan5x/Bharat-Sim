@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, lazy, Suspense, type FormEvent } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import {
   Activity,
@@ -38,23 +38,28 @@ import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from 
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
-import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
-import SpeakToTestView, { type SubmitRunOptions } from "./components/SpeakToTestView";
-import FixProofView from "./components/FixProofView";
+import type { SubmitRunOptions } from "./components/SpeakToTestView";
 import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-import LandingPage from "./components/LandingPage";
-import DashboardOverview from "./components/DashboardOverview";
-import NewTestWizard from "./components/NewTestWizard";
+import InferenceLoader from "./components/Animated/InferenceLoader";
+import ParticleField from "./components/Effects/ParticleField";
 import { downloadAnalysisPdf } from "./pdfExport";
-import CompareRunsView from "./components/CompareRunsView";
-import SettingsView from "./components/SettingsView";
 import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, uploadApkSigned, type SignedApkUploadTicket } from "./storageUpload";
 import { enterDemoMode, isDemoMode, readSession } from "./auth";
+
+// Lazy-loaded routes for code-splitting and rapid initial paint
+const LandingPage = lazy(() => import("./components/LandingPage"));
+const DashboardOverview = lazy(() => import("./components/DashboardOverview"));
+const NewTestWizard = lazy(() => import("./components/NewTestWizard"));
+const CompareRunsView = lazy(() => import("./components/CompareRunsView"));
+const SettingsView = lazy(() => import("./components/SettingsView"));
+const RunDetailView = lazy(() => import("./components/RunDetailView"));
+const SpeakToTestView = lazy(() => import("./components/SpeakToTestView"));
+const FixProofView = lazy(() => import("./components/FixProofView"));
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 // API_DOCS_URL kept for future use
@@ -351,6 +356,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <ParticleField />
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => {
@@ -404,7 +410,8 @@ export default function App() {
             </div>
           )}
 
-          <Routes>
+          <Suspense fallback={<InferenceLoader text="Loading BharatSim workspace..." />}>
+            <Routes>
             {/* Overview route */}
             <Route
               path="/"
@@ -901,6 +908,7 @@ export default function App() {
               }
             />
           </Routes>
+          </Suspense>
 
           <footer>
             <span>

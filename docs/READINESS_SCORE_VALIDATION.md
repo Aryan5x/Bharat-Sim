@@ -41,3 +41,4 @@ $$S = \max\left(0, 100 - \sum w_i \cdot P_i\right)$$
 - **80 – 100 (Tier 1 — Bharat Ready):** High stability on 2 GB devices; minimal jank; resilient to network throttling.
 - **60 – 79 (Tier 2 — Needs Optimization):** Perceptible UI stutter or elevated startup latency; risks LMK kills under memory pressure.
 - **0 – 59 (Tier 3 — Unfit for Budget Tier):** Crashes, ANRs, or severe memory leaks under Indian network and device constraints.
+
