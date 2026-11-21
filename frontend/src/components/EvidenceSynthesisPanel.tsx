@@ -28,7 +28,7 @@ export default function EvidenceSynthesisPanel({ diagnostics }: { diagnostics: E
         <div>
           <h3 id="evidence-fusion-title">Diagnostic evidence synthesis</h3>
           <p className="section-desc">
-            Deterministic correlation across logcat, condition readbacks, network controls and execution steps.
+            Deterministic correlation across logcat, condition read-backs, network controls and execution steps.
             It prioritizes investigation; it does not confirm a root cause.
           </p>
         </div>

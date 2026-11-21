@@ -51,6 +51,13 @@ export default function DashboardOverview({
   onLoadScenario
 }: DashboardOverviewProps) {
   const activeWorkersCount = workers.filter((w) => w.online).length;
+  const scoredRun = runs.find((r) => typeof r.readiness_score === "number");
+  const scoreValue = scoredRun ? scoredRun.readiness_score : analysis ? analysis.bharat_score.value : null;
+  const scoreFoot = scoredRun
+    ? "Latest emulator run · " + (scoredRun.apk_name || scoredRun.id.slice(0, 8))
+    : analysis
+    ? analysis.bharat_score.label
+    : "Run a test or analyse a log to get a score";
 
   return (
     <div className="dashboard-overview-container relative overflow-hidden" style={{ position: "relative" }}>
@@ -109,12 +116,12 @@ export default function DashboardOverview({
             BHARATSCORE <Gauge size={16} />
           </div>
           <div className="metric-value">
-            {analysis ? analysis.bharat_score.value : "—"}
-            <span className="metric-unit">{analysis ? " / 100" : " no report"}</span>
+            {scoreValue ?? "—"}
+            <span className="metric-unit">{scoreValue != null ? " / 100" : " no score yet"}</span>
           </div>
           <div className="metric-foot">
             <span className="score-dot" />
-            <span>{analysis ? analysis.bharat_score.label : "Calculated from submitted evidence"}</span>
+            <span>{scoreFoot}</span>
           </div>
         </div>
       </section>

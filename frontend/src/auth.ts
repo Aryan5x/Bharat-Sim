@@ -87,7 +87,10 @@ export async function refreshSession(): Promise<UserSession> {
 export async function signOut(): Promise<void> {
   const current = readSession();
   try {
-    if (current?.access_token) {
+    // An expired token is already invalid on the server; revoking it again only
+    // produces a 403, so skip the call and clear the local session.
+    const stillValid = current?.expires_at ? current.expires_at * 1000 > Date.now() + 5000 : false;
+    if (current?.access_token && stillValid) {
       await fetch(SUPABASE_URL + "/auth/v1/logout", {
         method: "POST",
         headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + current.access_token },

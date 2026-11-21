@@ -7,6 +7,11 @@ interface FindingCardProps {
 }
 
 export default function FindingCard({ finding: f }: FindingCardProps) {
+  const sx = f.sarvam_explanation;
+  // The API names these developer_fix / code_remedy; older payloads used remediation / defensive_code.
+  const fix = sx?.developer_fix || sx?.remediation || "";
+  const code = sx?.code_remedy || sx?.defensive_code || "";
+  const voiceText = sx?.hindi_explanation || fix || sx?.root_cause || f.recommendation || "";
   return (
     <article className="finding-card">
       <div className="finding-top">
@@ -14,13 +19,13 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
           <CircleAlert size={17} />
         </span>
         <div className="finding-title">
-          <span className="finding-kind">{f.kind.toUpperCase() + " · " + f.id}</span>
+          <span className="finding-kind">{String(f.kind || "signal").toUpperCase() + " · " + f.id}</span>
           <h3>{f.title}</h3>
         </div>
         <div className="finding-badges">
           {f.ml_classification && (
             <span className="ml-badge" title={`Confidence: ${(f.ml_classification.confidence * 100).toFixed(1)}%`}>
-              <Brain size={12} /> ML: {f.ml_classification.category.toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)}%)
+              <Brain size={12} /> ML: {String(f.ml_classification.category || "other").toUpperCase()} ({Math.round(f.ml_classification.confidence * 100)}%)
             </span>
           )}
           {f.occurrence_count ? <span className="occurrence-badge">{f.occurrence_count} occurrence{f.occurrence_count === 1 ? "" : "s"}</span> : null}
@@ -65,21 +70,21 @@ export default function FindingCard({ finding: f }: FindingCardProps) {
           <div className="sarvam-exp-body">
             <p><strong>Root Cause:</strong> {f.sarvam_explanation.root_cause}</p>
             <p><strong>Impact:</strong> {f.sarvam_explanation.impact}</p>
-            <p><strong>Fix:</strong> {f.sarvam_explanation.remediation}</p>
+            {fix && <p><strong>Fix:</strong> {fix}</p>}
             {f.sarvam_explanation.hindi_explanation && (
               <div className="hindi-briefing-box" lang="hi">
                 <small>हिंदी सारांश:</small>
                 <p>{f.sarvam_explanation.hindi_explanation}</p>
               </div>
             )}
-            {f.sarvam_explanation.defensive_code && (
+            {code && (
               <details className="defensive-code-details">
                 <summary><Code2 size={13} /> View defensive code fix</summary>
-                <pre><code>{f.sarvam_explanation.defensive_code}</code></pre>
+                <pre><code>{code}</code></pre>
               </details>
             )}
             <SarvamAudioPlayer
-              text={f.sarvam_explanation.hindi_explanation || f.sarvam_explanation.remediation}
+              text={voiceText}
               defaultLang="hi-IN"
               label="Listen to voice briefing (Bulbul TTS)"
             />

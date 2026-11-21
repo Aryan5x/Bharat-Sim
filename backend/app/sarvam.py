@@ -12,6 +12,9 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
+import time
+import uuid
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -28,6 +31,20 @@ class SarvamRateLimited(Exception):
 SUPPORTED_TARGETS = {"hi-IN", "ta-IN", "mr-IN"}
 SARVAM_TRANSLATE_URL = "https://api.sarvam.ai/translate"
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
+SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text"
+SARVAM_CHAT_URL = "https://api.sarvam.ai/v1/chat/completions"
+
+# Verified against docs.sarvam.ai and live calls on 21 Nov 2026.
+CHAT_MODEL = "sarvam-105b"
+STT_MODEL = "saaras:v4"
+TTS_MODEL = "bulbul:v3"
+TTS_SPEAKERS = {
+    "shubh", "aditya", "ritu", "priya", "neha", "rahul", "pooja", "rohan", "simran", "kavya", "amit", "dev",
+    "ishita", "shreya", "ratan", "varun", "manan", "sumit", "roopa", "kabir", "aayan", "ashutosh", "advait",
+    "anand", "tanya", "tarun", "sunny", "mani", "gokul", "vijay", "shruti", "suhani", "mohit", "kavitha",
+    "rehan", "soham", "rupali",
+}
+DEFAULT_SPEAKER = "priya"
 
 
 def get_sarvam_api_key() -> str:
@@ -89,7 +106,7 @@ def translate_report_text(text: str, target_language_code: str) -> str:
     return translated.strip()
 
 
-def generate_speech_audio(text: str, target_language_code: str = "hi-IN", speaker: str = "meera") -> dict[str, Any]:
+def generate_speech_audio(text: str, target_language_code: str = "hi-IN", speaker: str = DEFAULT_SPEAKER) -> dict[str, Any]:
     """Generate spoken audio from text using Sarvam Bulbul TTS API.
 
     Returns:
@@ -100,6 +117,8 @@ def generate_speech_audio(text: str, target_language_code: str = "hi-IN", speake
             - 'speaker': speaker voice name
     """
     clean_text = text.strip()[:500]
+    # bulbul:v1 voices (e.g. "meera") were retired; map anything unknown to a v3 voice.
+    speaker = speaker if speaker in TTS_SPEAKERS else DEFAULT_SPEAKER
     if not clean_text:
         raise ValueError("Text cannot be empty.")
     if target_language_code not in SUPPORTED_TARGETS and target_language_code != "en-IN":
@@ -126,15 +145,12 @@ def generate_speech_audio(text: str, target_language_code: str = "hi-IN", speake
         }
 
     payload = json.dumps({
-        "inputs": [clean_text],
-        "target_language_code": target_language_code,
+        "text": clean_text,
+        "language_code": target_language_code,
         "speaker": speaker,
-        "pitch": 0,
         "pace": 1.0,
-        "loudness": 1.5,
-        "speech_sample_rate": 8000,
-        "enable_preprocessing": True,
-        "model": "bulbul:v1",
+        "speech_sample_rate": 22050,
+        "model": TTS_MODEL,
     }).encode("utf-8")
 
     request = Request(
@@ -147,7 +163,7 @@ def generate_speech_audio(text: str, target_language_code: str = "hi-IN", speake
         with urlopen(request, timeout=20) as response:
             if response.status != 200:
                 raise SarvamProviderError("Sarvam TTS returned an unexpected response.")
-            result = json.loads(response.read(512 * 1024).decode("utf-8"))
+            result = json.loads(response.read(4 * 1024 * 1024).decode("utf-8"))
     except HTTPError as exc:
         if exc.code == 429:
             raise SarvamRateLimited() from None
@@ -164,6 +180,8 @@ def generate_speech_audio(text: str, target_language_code: str = "hi-IN", speake
         "format": "audio/wav",
         "language_code": target_language_code,
         "speaker": speaker,
+        "model": TTS_MODEL,
+        "request_id": result.get("request_id"),
         "is_fixture": False,
     }
 
@@ -231,3 +249,119 @@ def explain_failure_with_sarvam(
             pass
 
     return base
+
+
+class SarvamNotConfigured(SarvamProviderError):
+    """No server-side Sarvam key is configured."""
+
+
+def _post_json(url: str, body: dict[str, Any], timeout: float, max_bytes: int = 256 * 1024) -> dict[str, Any]:
+    api_key = get_sarvam_api_key()
+    if len(api_key) < 16:
+        raise SarvamNotConfigured("Sarvam API credentials are not configured.")
+    request = Request(url, data=json.dumps(body).encode("utf-8"), method="POST",
+                      headers={"Content-Type": "application/json", "api-subscription-key": api_key})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read(max_bytes).decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 429:
+            raise SarvamRateLimited() from None
+        raise SarvamProviderError(f"Sarvam rejected the request (HTTP {exc.code}).") from None
+    except (URLError, TimeoutError, OSError, ValueError):
+        raise SarvamProviderError("Sarvam request failed or timed out.") from None
+
+
+def chat_json(system: str, user: str, schema: dict[str, Any], schema_name: str, timeout: float = 25,
+              max_tokens: int = 900) -> dict[str, Any]:
+    """Ask sarvam-105b for a JSON object that follows `schema` (Structured Outputs).
+
+    Returns {"content": <raw string>, "request_id", "model", "latency_ms", "usage"}. The caller must
+    still parse and validate the content: model output is untrusted.
+    """
+    started = time.monotonic()
+    result = _post_json(SARVAM_CHAT_URL, {
+        "model": CHAT_MODEL,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+        "response_format": {"type": "json_schema", "json_schema": {"name": schema_name, "strict": True, "schema": schema}},
+        "reasoning_effort": None,
+        "temperature": 0.1,
+        "max_tokens": max_tokens,
+    }, timeout=timeout)
+    try:
+        content = result["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise SarvamProviderError("Sarvam returned no completion.") from None
+    if not isinstance(content, str):
+        raise SarvamProviderError("Sarvam returned a non-text completion.")
+    return {
+        "content": content,
+        "request_id": result.get("id"),
+        "model": result.get("model") or CHAT_MODEL,
+        "latency_ms": round((time.monotonic() - started) * 1000),
+        "usage": result.get("usage"),
+    }
+
+
+_AUDIO_TYPE = re.compile(r"audio/[A-Za-z0-9.+-]+")
+
+
+def transcribe_audio(audio: bytes, filename: str, content_type: str, timeout: float = 30) -> dict[str, Any]:
+    """Transcribe a short voice note with Saaras (auto-detects the Indian language)."""
+    api_key = get_sarvam_api_key()
+    if len(api_key) < 16:
+        raise SarvamNotConfigured("Sarvam API credentials are not configured.")
+    boundary = uuid.uuid4().hex
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", filename or "voice.webm")[:60] or "voice.webm"
+    match = _AUDIO_TYPE.match(content_type or "")
+    safe_type = match.group(0) if match else "audio/webm"
+    crlf = "\r\n"
+    head = (
+        f"--{boundary}{crlf}Content-Disposition: form-data; name=\"model\"{crlf}{crlf}{STT_MODEL}{crlf}"
+        f"--{boundary}{crlf}Content-Disposition: form-data; name=\"language_code\"{crlf}{crlf}unknown{crlf}"
+        f"--{boundary}{crlf}Content-Disposition: form-data; name=\"file\"; filename=\"{safe_name}\"{crlf}"
+        f"Content-Type: {safe_type}{crlf}{crlf}"
+    ).encode()
+    body = head + audio + f"{crlf}--{boundary}--{crlf}".encode()
+    request = Request(SARVAM_STT_URL, data=body, method="POST",
+                      headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "api-subscription-key": api_key})
+    started = time.monotonic()
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            result = json.loads(response.read(256 * 1024).decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 429:
+            raise SarvamRateLimited() from None
+        raise SarvamProviderError(f"Sarvam could not transcribe the audio (HTTP {exc.code}).") from None
+    except (URLError, TimeoutError, OSError, ValueError):
+        raise SarvamProviderError("Sarvam transcription failed or timed out.") from None
+    transcript = result.get("transcript") if isinstance(result, dict) else None
+    if not isinstance(transcript, str):
+        raise SarvamProviderError("Sarvam returned no transcript.")
+    return {
+        "transcript": transcript.strip()[:2000],
+        "language_code": result.get("language_code"),
+        "request_id": result.get("request_id"),
+        "model": STT_MODEL,
+        "latency_ms": round((time.monotonic() - started) * 1000),
+    }
+
+
+def translate_text(text: str, target_language_code: str, source_language_code: str = "en-IN") -> str:
+    """Translate between English and Hindi/Tamil/Marathi (either direction)."""
+    value = text.strip()
+    if not value or len(value) > 2000:
+        raise ValueError("Translation text must contain between 1 and 2,000 characters.")
+    allowed = SUPPORTED_TARGETS | {"en-IN"}
+    if target_language_code not in allowed or source_language_code not in allowed:
+        raise ValueError("Unsupported translation language.")
+    if target_language_code == source_language_code:
+        return value
+    result = _post_json(SARVAM_TRANSLATE_URL, {
+        "input": value, "source_language_code": source_language_code,
+        "target_language_code": target_language_code, "model": "sarvam-translate:v1",
+    }, timeout=15, max_bytes=64 * 1024)
+    translated = result.get("translated_text")
+    if not isinstance(translated, str) or not translated.strip():
+        raise SarvamProviderError("Sarvam returned an invalid translation.")
+    return translated.strip()

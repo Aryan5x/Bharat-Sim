@@ -43,7 +43,7 @@ export default function NewTestWizard({
   const [fileSha, setFileSha] = useState<string | null>(null);
   const [calculatingHash, setCalculatingHash] = useState(false);
   // Current worker API applies fixed defaults; these are shown read-only until per-run overrides are supported.
-  const interactionCount = 100;
+  const interactionCount = 150;
   const enableGfxinfo = true;
   const enableMeminfo = true;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -254,7 +254,7 @@ export default function NewTestWizard({
                   </div>
                   <div>
                     <small>Bandwidth</small>
-                    <b>{p.down_kbps} kbps</b>
+                    <b>{p.down_kbps > 0 ? p.down_kbps + " kbps" : "Unlimited"}</b>
                   </div>
                   <div>
                     <small>Packet loss</small>
@@ -276,14 +276,14 @@ export default function NewTestWizard({
                 </div>
                 <span className="risk-badge medium">CUSTOM</span>
               </div>
-              <p className="persona-desc">Set RAM, CPU cores, screen, storage, battery saver, bandwidth, latency, loss, resets and outage length. Every value is applied on the emulator.</p>
+              <p className="persona-desc">Set RAM, CPU cores, screen, storage, battery saver, bandwidth, latency, loss, resets and outage length. The report shows what was actually applied.</p>
             </button>
           </div>
           {selectedPersona === "custom" && (
             <CustomPersonaBuilder value={customPersona} onChange={onCustomPersonaChange} />
           )}
           <p className="worker-defaults-note">
-            Persona values are requested targets, not proof that every condition is applied. The worker verifies supported latency/bandwidth and reversible battery/storage controls; packet loss and CPU throttling are unsupported, while RAM is report-only.
+            Persona values are requested targets. The engine worker applies latency, bandwidth, packet loss, resets and outages through a host shaping proxy, and each report says whether the app's traffic actually went through it. Battery saver and storage pressure are applied on the emulator; RAM is capped only below 2 GB or at 3–4 GB, and CPU throttling is not applied.
           </p>
         </div>
 
@@ -298,11 +298,9 @@ export default function NewTestWizard({
             <div className="setting-box">
               <label htmlFor="monkey-events">Automated UI Exploration</label>
               <select id="monkey-events" value={interactionCount} disabled aria-describedby="worker-defaults-note">
-                <option value={50}>50 Throttled Monkey Events (Quick Smoke)</option>
-                <option value={100}>100 Throttled Monkey Events (Recommended)</option>
-                <option value={200}>200 Throttled Monkey Events (Deep Stress)</option>
+                <option value={150}>150 monkey events per run (baseline and persona)</option>
               </select>
-              <small>Throttled at 250ms per action, zero system/appswitch key exits.</small>
+              <small>250 ms between actions; system keys and app switching are disabled. Each run also does 3 cold starts.</small>
             </div>
 
             <div className="telemetry-toggles">

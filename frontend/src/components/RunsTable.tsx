@@ -141,6 +141,9 @@ export default function RunsTable({ runs, personas, onDeleted }: RunsTableProps)
                       <span className={"run-status " + statusClass}>
                         {displayRunStatus(run.status)}
                       </span>
+                      {typeof run.readiness_score === "number" && (
+                        <small className="table-sub">score {run.readiness_score}/100</small>
+                      )}
                     </td>
                     <td><code title={run.apk_sha256 || undefined}>{run.apk_sha256?.slice(0, 16) || "—"}</code></td>
                     <td>

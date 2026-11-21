@@ -25,6 +25,8 @@ export default function Topbar({
 }: TopbarProps) {
   const tabTitles: Record<string, string> = {
     overview: "Overview & Dashboard",
+    speak: "Speak to Test",
+    fixproof: "FixProof",
     "new-test": "Configure New Test",
     runs: "Test Runs",
     analysis: "Logcat & ML Analysis",
@@ -62,8 +64,8 @@ export default function Topbar({
       </div>
 
       <div className="top-actions">
-        <a className="api-docs-link" href="/docs" target="_blank" rel="noreferrer" aria-label="API documentation">
-          API docs
+        <a className="api-docs-link" href="https://github.com/kaustubhdua/Bharat-Sim#readme" target="_blank" rel="noreferrer" aria-label="Project documentation on GitHub">
+          Docs
         </a>
         {/* Evaluator Quick Tour Shortcut Button */}
         <button

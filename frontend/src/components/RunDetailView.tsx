@@ -17,6 +17,7 @@ import {
   Wifi
 } from "lucide-react";
 import EvidenceSynthesisPanel from "./EvidenceSynthesisPanel";
+import EngineReportView, { isEngineReport } from "./EngineReportView";
 import RunComparisonModal from "./RunComparisonModal";
 import {
   api,
@@ -43,7 +44,7 @@ function conditionStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     already_satisfied: "Already satisfied before test (no intervention)",
     applied_and_verified: "Applied and verified",
-    partially_applied_and_verified: "Partially applied; readback verified",
+    partially_applied_and_verified: "Partially applied; read-back verified",
     partially_applied: "Partially applied",
     partial_failure: "Partial failure",
     unsupported: "Unsupported",
@@ -402,6 +403,8 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
               : "Execution waits until an authenticated, isolated Android worker executes the test."}
           </p>
         </div>
+      ) : isEngineReport(report) ? (
+        <EngineReportView report={report as unknown as Record<string, unknown>} runId={run.id} spec={(run as unknown as { scenario?: { spec?: Record<string, unknown> } }).scenario?.spec ?? null} />
       ) : (
         <div className="run-evidence-body">
           {report.diagnostics ? <EvidenceSynthesisPanel diagnostics={report.diagnostics} /> : null}
@@ -480,7 +483,7 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
             <div className="section-kicker">03 / CONDITIONS APPLIED</div>
             <h3>Requested vs actually applied conditions</h3>
             <p className="section-desc">
-              Truthful verification: emulator control-plane commands and readbacks are verified. RAM restriction is report-only; packet loss and CPU throttling remain unsupported.
+              Truthful verification: emulator control-plane commands and read-backs are verified. RAM restriction is report-only; packet loss and CPU throttling remain unsupported.
             </p>
 
             <div className="condition-summary-bar">

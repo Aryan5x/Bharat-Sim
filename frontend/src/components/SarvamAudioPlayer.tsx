@@ -9,11 +9,15 @@ interface SarvamAudioPlayerProps {
 }
 
 let ttsCapabilityPromise: Promise<boolean> | null = null;
+let ttsNeedsSignIn = false;
 
 function getTtsAvailability(): Promise<boolean> {
   if (!ttsCapabilityPromise) {
     ttsCapabilityPromise = api<Capabilities>("/api/v1/capabilities")
-      .then((capabilities) => capabilities.sarvam_audio_tts === true)
+      .then((capabilities) => {
+        ttsNeedsSignIn = capabilities.authenticated === false;
+        return capabilities.sarvam_audio_tts === true;
+      })
       .catch(() => {
         ttsCapabilityPromise = null;
         return false;
@@ -82,7 +86,7 @@ export default function SarvamAudioPlayer({
     setLoading(true);
     setError(null);
     try {
-      const response = await synthesizeSpeechAudio(text.slice(0, 500), lang);
+      const response = await synthesizeSpeechAudio((text || "").slice(0, 500), lang);
 
       // The API deliberately returns an explicitly marked silent fixture when
       // SARVAM_API_KEY is absent. Never present that fixture as spoken output.
@@ -153,7 +157,7 @@ export default function SarvamAudioPlayer({
           type="button"
           className={"audio-play-button " + (playing ? "playing" : "")}
           onClick={() => void handlePlay()}
-          disabled={ttsAvailable !== true || loading || !text.trim()}
+          disabled={ttsAvailable !== true || loading || !(text || "").trim()}
           title={ttsAvailable === true ? (playing ? "Pause briefing" : "Generate and play voice briefing") : "Sarvam speech generation is not configured"}
         >
           {loading ? (
@@ -167,7 +171,7 @@ export default function SarvamAudioPlayer({
         </button>
       </div>
 
-      {ttsAvailable === false && <span className="audio-error" role="status">Voice generation is not configured on this backend. Add SARVAM_API_KEY as a server-only environment variable.</span>}
+      {ttsAvailable === false && <span className="audio-error" role="status">{ttsNeedsSignIn ? "Sign in to hear the voice briefing." : "Voice generation is not configured on this backend."}</span>}
       {error && <span className="audio-error" role="status">{error}</span>}
     </div>
   );

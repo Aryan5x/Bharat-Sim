@@ -41,6 +41,8 @@ import ScoreRing from "./components/ScoreRing";
 import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
+import SpeakToTestView, { type SubmitRunOptions } from "./components/SpeakToTestView";
+import FixProofView from "./components/FixProofView";
 import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
@@ -102,6 +104,10 @@ export default function App() {
     ? "new-test"
     : location.pathname.startsWith("/settings")
     ? "settings"
+    : location.pathname.startsWith("/speak")
+    ? "speak"
+    : location.pathname.startsWith("/fixproof")
+    ? "fixproof"
     : location.pathname.startsWith("/landing")
     ? "landing"
     : "overview";
@@ -173,7 +179,7 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [hasActiveRun]);
 
-  async function submitApkFile(targetFile: File) {
+  async function submitApkFile(targetFile: File, options?: SubmitRunOptions) {
     if (previewMode) {
       setError("APK registration is available only after signing in. The public preview is limited to personas and risk planning.");
       return;
@@ -185,11 +191,13 @@ export default function App() {
       if (capabilities?.database_persistence !== true || capabilities?.apk_upload !== true) {
         throw new Error("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
       }
-      if (selected === "custom") {
+      if (!options && selected === "custom") {
         const problems = customPersonaErrors(customPersona);
         if (problems.length) throw new Error("Fix the custom persona first: " + problems.join("; "));
       }
-      const personaFields = selected === "custom" ? { persona_id: "custom", custom_persona: customPersona } : { persona_id: selected };
+      const personaFields = options
+        ? { persona_id: options.personaId, ...(options.scenario ? { scenario: options.scenario } : {}) }
+        : selected === "custom" ? { persona_id: "custom", custom_persona: customPersona } : { persona_id: selected };
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
         if (!globalThis.crypto?.subtle) throw new Error("Secure file hashing is unavailable in this browser.");
@@ -252,7 +260,8 @@ export default function App() {
         }
         const body = new FormData();
         body.append("persona_id", personaFields.persona_id);
-        if (selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
+        if (!options && selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
+        if (options?.scenario) body.append("scenario", JSON.stringify(options.scenario));
         body.append("apk", targetFile);
         run = await api<Run & { message: string }>("/api/v1/runs", {
           method: "POST",
@@ -642,6 +651,12 @@ export default function App() {
                 />
               }
             />
+
+            <Route
+              path="/speak"
+              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
+            />
+            <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
 
             {/* Comparative Telemetry & Anomaly Analysis route */}
             <Route

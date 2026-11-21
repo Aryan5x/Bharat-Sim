@@ -99,7 +99,7 @@ export default function EvaluatorTourBanner({ onLoadScenario }: EvaluatorTourBan
                 </div>
                 <div className="meta-card">
                   <small>ML Category</small>
-                  <b className="ml-tag">{selectedScenario.expected_ml_category.toUpperCase()}</b>
+                  <b className="ml-tag">{(selectedScenario.expected_ml_category || "other").toUpperCase()}</b>
                 </div>
               </div>
 
@@ -109,19 +109,19 @@ export default function EvaluatorTourBanner({ onLoadScenario }: EvaluatorTourBan
               <div className="scenario-metrics-bar">
                 <div className="metric-box">
                   <small>Cold Start</small>
-                  <b>{selectedScenario.metrics.cold_start_ms} ms</b>
+                  <b>{selectedScenario.metrics?.cold_start_ms ?? "—"} ms</b>
                 </div>
                 <div className="metric-box">
                   <small>Jank Frames</small>
-                  <b>{selectedScenario.metrics.jank_frame_pct}%</b>
+                  <b>{selectedScenario.metrics?.jank_frame_pct ?? "—"}%</b>
                 </div>
                 <div className="metric-box">
                   <small>Peak Memory</small>
-                  <b>{selectedScenario.metrics.memory_peak_mb} MB</b>
+                  <b>{selectedScenario.metrics?.memory_peak_mb ?? "—"} MB</b>
                 </div>
                 <div className="metric-box">
                   <small>Network Latency</small>
-                  <b>{selectedScenario.metrics.network_latency_ms} ms</b>
+                  <b>{selectedScenario.metrics?.network_latency_ms ?? "—"} ms</b>
                 </div>
               </div>
 
@@ -130,11 +130,11 @@ export default function EvaluatorTourBanner({ onLoadScenario }: EvaluatorTourBan
                   <Zap size={14} />
                   <span>SARVAM AI INDIC DIAGNOSTIC BRIEFING</span>
                 </div>
-                <p className="insight-hi" lang="hi">{selectedScenario.sarvam_insight.hi}</p>
-                <small className="insight-en">{selectedScenario.sarvam_insight.en}</small>
+                <p className="insight-hi" lang="hi">{selectedScenario.sarvam_insight?.hi}</p>
+                <small className="insight-en">{selectedScenario.sarvam_insight?.en}</small>
 
                 <SarvamAudioPlayer
-                  text={selectedScenario.sarvam_insight.hi}
+                  text={selectedScenario.sarvam_insight?.hi || selectedScenario.description}
                   defaultLang="hi-IN"
                   label="Listen in Hindi, Tamil or Marathi (Bulbul TTS)"
                 />

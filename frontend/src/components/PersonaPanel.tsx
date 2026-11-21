@@ -32,7 +32,7 @@ export default function PersonaPanel({
             </div>
           )}
           <p className="profile-caveat">
-            These are authored test targets, not measurements from physical devices. The worker applies and verifies emulator latency, bandwidth, battery-saver and bounded storage-pressure conditions; packet loss and CPU throttling are unsupported, RAM is report-only, and arbitrary traffic-path verification is fixture-only.
+            These are authored test targets, not measurements from physical devices. The engine worker applies latency, bandwidth and packet loss through a shaping proxy plus battery saver and storage pressure on the emulator; each report records what was applied and whether app traffic went through the proxy. CPU throttling is not applied.
           </p>
           {apiStatus !== "online" && (
             <p className="profile-caveat">
@@ -107,7 +107,7 @@ export default function PersonaPanel({
           </div>
           <p>{persona.description}</p>
           <p className="profile-caveat">
-            Profile targets are not device measurements. Emulator runs can apply and verify latency, bandwidth, battery-saver and bounded storage-pressure conditions; fixture CI separately measures a real request. Packet loss and CPU throttling remain unsupported, RAM is report-only, and arbitrary APK traffic is not verified.
+            Profile targets are not device measurements. The engine worker applies latency, bandwidth and packet loss through a shaping proxy, plus battery saver and storage pressure; the run report shows the values read back and whether the app's traffic went through the proxy. CPU throttling is not applied.
           </p>
           <div className="detail-grid">
             <span>
@@ -123,7 +123,7 @@ export default function PersonaPanel({
               </b>
             </span>
             <span>
-              <small>PACKET LOSS · NOT APPLIED</small>
+              <small>PACKET LOSS</small>
               <b>{persona.packet_loss_pct}% target</b>
             </span>
             <span>

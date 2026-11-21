@@ -4,18 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0b1020" />
-    <script>
-      (() => {
-        try {
-          const saved = localStorage.getItem("bharatsim.theme");
-          document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
-        } catch {
-          document.documentElement.dataset.theme = "dark";
-        }
-      })();
-    </script>
-    <meta name="description" content="BharatSim registers Android smoke runs, analyzes logcat evidence, and verifies Android Emulator latency, bandwidth, battery saver, and bounded storage pressure on disposable emulators. RAM is report-only; packet loss and CPU throttling are unsupported." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script src="/theme-init.js"></script>
+    <meta name="description" content="BharatSim tests Android apps on a real budget-phone emulator under Indian network conditions, compares every run with a normal baseline, and explains crashes, freezes and network failures in Indian languages." />
     <title>BharatSim — The Cheap Phone Test</title>
+    <link rel="canonical" href="https://bharatsim.onrender.com/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BharatSim" />
+    <meta property="og:title" content="BharatSim — The Cheap Phone Test" />
+    <meta property="og:description" content="Run your Android app on a budget-phone emulator under 2G, 3G and congested networks, against a baseline, and see what breaks." />
+    <meta property="og:url" content="https://bharatsim.onrender.com/" />
+    <meta property="og:image" content="https://bharatsim.onrender.com/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
 </html>

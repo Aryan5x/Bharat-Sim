@@ -26,14 +26,19 @@ BAT = ".bat" if os.name == "nt" else ""
 APPS = {
     "fragile-news": {"package": "in.bharatsim.fragile", "label": "Fragile News", "version": "1.0"},
     "steady-notes": {"package": "in.bharatsim.steady", "label": "Steady Notes", "version": "1.0"},
+    # Payment pending + retry scenario: one source, two builds (same package and key).
+    "bharatpay-original": {"package": "in.bharatsim.paymock", "label": "BharatPay Mock", "version": "1.0-original",
+                           "code": 1, "src": "bharatpay", "fixed": False, "cleartext": True},
+    "bharatpay-fixed": {"package": "in.bharatsim.paymock", "label": "BharatPay Mock", "version": "1.1-fixed",
+                        "code": 2, "src": "bharatpay", "fixed": True, "cleartext": True},
 }
 
 MANIFEST = """<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="{package}" android:versionCode="1" android:versionName="{version}">
+    package="{package}" android:versionCode="{code}" android:versionName="{version}">
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:label="{label}" android:allowBackup="false">
+    <application android:label="{label}" android:allowBackup="false"{cleartext_attr}>
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -61,13 +66,25 @@ def keystore() -> Path:
 
 def build(name: str, meta: dict) -> Path:
     print(f"Building {name}")
-    src = HERE / name / "src"
+    src = HERE / meta.get("src", name) / "src"
     work = OUT / f"{name}-build"
     shutil.rmtree(work, ignore_errors=True)
     (work / "classes").mkdir(parents=True)
     manifest = work / "AndroidManifest.xml"
-    manifest.write_text(MANIFEST.format(**meta), encoding="utf-8")
+    fields = {"code": 1, **meta,
+              "cleartext_attr": ' android:usesCleartextTraffic="true"' if meta.get("cleartext") else ""}
+    manifest.write_text(MANIFEST.format(**fields), encoding="utf-8")
     sources = [str(p) for p in src.rglob("*.java")]
+    if "fixed" in meta:
+        # Build flag for one-source, two-build fixtures.
+        pkg_dir = work / "gen" / Path(*meta["package"].split("."))
+        pkg_dir.mkdir(parents=True)
+        flags = pkg_dir / "Flags.java"
+        flag = "true" if meta["fixed"] else "false"
+        lines = ["package " + meta["package"] + ";", "", "final class Flags {",
+                 "    static final boolean FIXED = " + flag + ";", "}", ""]
+        flags.write_text("\n".join(lines), encoding="utf-8")
+        sources.append(str(flags))
     run(["javac", "--release", "11", "-classpath", PLATFORM_JAR, "-d", work / "classes", *sources])
     classes = [str(p) for p in (work / "classes").rglob("*.class")]
     run([BUILD_TOOLS / f"d8{BAT}", "--release", "--min-api", "24", "--lib", PLATFORM_JAR, "--output", work, *classes])

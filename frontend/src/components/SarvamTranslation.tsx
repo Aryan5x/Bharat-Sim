@@ -24,7 +24,7 @@ export default function SarvamTranslation({ enabled, text }: Props) {
       const result = await api<{ translated_text: string }>("/api/v1/translate/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.slice(0, 2000), target_language_code: language })
+        body: JSON.stringify({ text: (text || "").slice(0, 2000), target_language_code: language })
       });
       setTranslated(result.translated_text);
     } catch (err) {
@@ -58,7 +58,7 @@ export default function SarvamTranslation({ enabled, text }: Props) {
         <select id="sarvam-language" value={language} onChange={event => setLanguage(event.target.value as typeof language)}>
           {languages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}
         </select>
-        <button className="secondary-button" onClick={() => void translate()} disabled={!enabled || busy || !text.trim()}>
+        <button className="secondary-button" onClick={() => void translate()} disabled={!enabled || busy || !(text || "").trim()}>
           {busy ? <LoaderCircle className="spin" size={15} /> : <Languages size={15} />}
           {busy ? "Translating…" : "Translate report"}
         </button>
