@@ -17,25 +17,21 @@ export const Marquee: React.FC<MarqueeProps> = ({
 }) => {
   return (
     <div
-      className={`group flex overflow-hidden p-2 select-none ${className}`}
+      className={`marquee-container ${pauseOnHover ? "pause-on-hover" : ""} ${className}`}
       style={{
         maskImage: "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
         WebkitMaskImage: "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
       }}
     >
       <div
-        className={`flex shrink-0 items-center justify-around gap-4 animate-marquee ${
-          direction === "right" ? "marquee-reverse" : ""
-        } ${pauseOnHover ? "group-hover:[animation-play-state:paused]" : ""}`}
+        className={`marquee-track ${direction === "right" ? "animate-marquee-reverse" : "animate-marquee"}`}
         style={{ animationDuration: `${speed}s` }}
       >
         {children}
       </div>
       <div
         aria-hidden="true"
-        className={`flex shrink-0 items-center justify-around gap-4 animate-marquee ${
-          direction === "right" ? "marquee-reverse" : ""
-        } ${pauseOnHover ? "group-hover:[animation-play-state:paused]" : ""}`}
+        className={`marquee-track ${direction === "right" ? "animate-marquee-reverse" : "animate-marquee"}`}
         style={{ animationDuration: `${speed}s` }}
       >
         {children}

@@ -3185,3 +3185,24 @@ svg { flex-shrink: 0; }
 .explain-result details{margin:8px 0}
 .explain-result code{font:10px var(--mono)}
 @media (max-width:640px){.speak-actions>*{flex:1 1 100%}}
+
+/* Effects components (no Tailwind in this project: real classes) */
+.particle-field-canvas{opacity:.4}
+.spotlight-wrap{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+.spotlight-svg{position:absolute;top:0;left:0;width:138%;height:169%;opacity:0;pointer-events:none}
+@media (min-width:1024px){.spotlight-svg{width:84%}}
+.dashboard-overview-container>*:not(.spotlight-wrap),.landing-hero>*:not(.spotlight-wrap){position:relative;z-index:1}
+.marquee-container{display:flex;overflow:hidden;padding:8px;user-select:none;max-width:100%}
+.marquee-track{display:flex;flex-shrink:0;align-items:center;justify-content:space-around;gap:16px;padding-right:16px}
+.marquee-container.pause-on-hover:hover .marquee-track{animation-play-state:paused}
+.inference-loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;min-height:260px;width:100%}
+.inference-loader.fullscreen{position:fixed;inset:0;z-index:50;background:rgba(9,9,11,.85);backdrop-filter:blur(8px)}
+.inference-rings{position:relative;display:flex;align-items:center;justify-content:center;width:80px;height:80px}
+.inference-rings .ring{position:absolute;border-radius:50%}
+.ring-outer{width:80px;height:80px;border:1px solid rgba(16,185,129,.25);animation:pulse-radar 2s ease-out infinite}
+.ring-mid{width:64px;height:64px;border:1px solid rgba(16,185,129,.35)}
+.ring-core{width:48px;height:48px;background:rgba(16,185,129,.1)}
+.inference-core{position:relative;z-index:1;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;border:1px solid rgba(16,185,129,.5);background:var(--bg-surface);color:#34d399;box-shadow:0 0 24px rgba(16,185,129,.35)}
+.inference-text{margin-top:18px;text-align:center}
+.inference-text b{display:block;font:600 11px var(--mono);letter-spacing:1px;text-transform:uppercase;color:#34d399}
+.inference-text small{display:block;margin-top:6px;font-size:12px;color:var(--text-muted);max-width:380px}

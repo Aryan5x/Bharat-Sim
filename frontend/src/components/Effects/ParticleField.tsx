@@ -159,7 +159,7 @@ export const ParticleField: React.FC<{ className?: string }> = ({ className = ""
   return (
     <canvas
       ref={canvasRef}
-      className={`pointer-events-none fixed inset-0 z-0 opacity-40 transition-opacity duration-1000 ${className}`}
+      className={`particle-field-canvas ${className}`}
       aria-hidden="true"
     />
   );
