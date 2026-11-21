@@ -1323,6 +1323,9 @@ def sign_apk_upload(payload: SignedUploadRequest, request: Request):
         "run_id": run_id,
         "upload_token": upload_capability["upload_token"],
         "tus_endpoint": upload_capability["tus_endpoint"],
+        # Single signed PUT (preferred): Supabase's resumable endpoint rejects signed
+        # uploads with an RLS error on this project, while the signed PUT succeeds.
+        "signed_upload_url": signed_url,
         "object_path": object_path,
         "expires_in_seconds": 7200,
         "message": "A resumable private upload is ready. Upload the APK in retryable chunks, then confirm the upload.",

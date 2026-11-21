@@ -43,7 +43,7 @@ import RunDetailView from "./components/RunDetailView";
 import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
-import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
+import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, uploadApkSigned, type SignedApkUploadTicket } from "./storageUpload";
 import { isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
@@ -175,6 +175,11 @@ export default function App() {
         const digest = await crypto.subtle.digest("SHA-256", await apk.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
         let ticket = getPendingApkUpload(sha256, apk);
+        if (ticket && !ticket.signed_upload_url) {
+          // Tickets from the old resumable flow cannot be completed; start fresh.
+          clearPendingApkUpload(sha256);
+          ticket = null;
+        }
         if (ticket) {
           // Only resume when the server still has this run waiting for its upload;
           // a deleted, cancelled or already-uploaded run needs a fresh ticket.
@@ -200,7 +205,8 @@ export default function App() {
           setNotice("Uploading APK securely… " + percentage + "%");
         };
         try {
-          await uploadApkResumable(apk, sha256, ticket, uploadProgress);
+          if (ticket.signed_upload_url) await uploadApkSigned(apk, ticket, uploadProgress);
+          else await uploadApkResumable(apk, sha256, ticket, uploadProgress);
         } catch (uploadError) {
           if (!(uploadError instanceof Error) || !uploadError.message.includes("fresh upload ticket")) throw uploadError;
           clearPendingApkUpload(sha256);
