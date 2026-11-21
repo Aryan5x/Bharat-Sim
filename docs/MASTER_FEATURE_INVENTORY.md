@@ -100,3 +100,33 @@ This inventory is the judge-facing source of truth. “Implemented” means code
 - The latest fully green CI, dependency audit and Android emulator workflow are on commit `13a829407433a24a9cd3f508fe0a41ed4838b6d4`.
 - Additional readiness diagnostics, independent ML holdout, repeated Failure DNA/FixProof tests, 500 MiB worker limit alignment and accessibility checks were committed after that SHA. They have not yet been rerun in CI.
 - A Vercel preview for `13a8294` built successfully, but its readiness endpoint returned 503 because preview intentionally does not receive the Production-only database URL or server Storage key. The Vercel deployment API then reached its 100-deployments/day limit, so the latest head could not be redeployed during this session.
+
+
+## Latest validation update — 2026-11-22
+
+Code validation is complete on code SHA `93ecced18a273bf9c206eb60aab1b1e9f03c3b65`:
+
+- Backend: **253 passed, 2 skipped**.
+- Frontend unit tests: **61 passed**.
+- Playwright E2E: **14 passed**, including the accessible-name/alt-text smoke audit and 320–1440px responsive coverage.
+- PostgreSQL integration: **3 passed**; all nine isolated BharatSim migrations applied from a clean database.
+- Worker guards, unified Vercel build and container/Compose smoke: passed.
+- Dependency security audit: **Python and JavaScript checks passed**.
+- Android emulator smoke: **passed**. The CI flow starts the local API, registers a worker, uploads the source-built fixture APK, leases/downloads/installs/launches it, receives and persists the worker report, and checks failure cases.
+- Measured Android HTTPS fixture traffic: `traffic_path_verified=true`; baseline median 890 ms, bandwidth-only median 1,431 ms, observed bandwidth delta +541 ms; injected latency samples 150.47–150.61 ms. The CI gate uses per-tunnel proxy telemetry; wall-clock latency deltas are diagnostic only. This validates the source-built fixture path, not arbitrary customer APK traffic.
+
+Additional evidence:
+- Refreshed live Sarvam evidence at `2026-11-21T23:46:24Z`: five Hindi/Hinglish/Tamil interpretation requests returned HTTP 200 with provider `sarvam-105b` and no fallback; Hindi and Tamil TTS/STT were non-fixture. This is a live provider check, not a Production Vercel endpoint check.
+- The 48-case curated ML holdout and repeated Failure DNA/FixProof regression tests are included in the 253 passing backend tests. The holdout dry-run was 79.2% accuracy and approximately 0.787 macro-F1; it is not field accuracy.
+- The 500 MiB API/worker/runner upload limit is aligned.
+
+The following release blockers remain unchanged:
+- Vercel Production has a sensitive `BHARATSIM_DATABASE_URL`, but its value cannot be inspected through the connected integration; the last Production readiness check was HTTP 503 with database unavailable.
+- The Vercel environment inventory has no `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The private `bharatsim-private` bucket exists but has zero APK objects and no object policies; no live upload/download/delete lifecycle has passed.
+- No live two-account Production tenant test.
+- No deployed KVM/Firecracker per-job worker host; Vercel flags `BHARATSIM_WORKER_ISOLATION_ATTESTED=false` and `BHARATSIM_WORKER_EGRESS_RESTRICTED=false`.
+- No full Production user-uploaded APK → isolated worker → persistent report → reopen/export journey.
+- Manual screen-reader, keyboard/focus, contrast and physical-device checks remain.
+- The Production Vercel deployment remains on `76f5b7e`; environment edits apply only to the next deployment. The PR branch has passed the unified Vercel build, but no preview deployment was found for this final SHA during the validation window.
+
+This validation update is documentation-only; the tested application code is SHA `93ecced18a273bf9c206eb60aab1b1e9f03c3b65`.
