@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Smartphone, Wifi, Activity, Layers, ArrowRight,
-  ChevronRight, Brain, Sparkles, Terminal, CheckCircle2
+  ChevronRight, Brain, Sparkles, Terminal, CheckCircle2, Mic, ShieldCheck
 } from "lucide-react";
 import { type Persona, type EvaluatorScenario, fallbackPersonas } from "../api";
 import EvaluatorTourBanner from "./EvaluatorTourBanner";
@@ -33,11 +33,11 @@ export default function LandingPage({
     },
     {
       q: "How does the Machine Learning failure classifier work?",
-      a: "BharatSim uses a portable TF-IDF class-centroid classifier trained on a small curated set of Android logcat examples. The reported 100% figure is training-set resubstitution, not independent holdout accuracy. Treat the category as a triage hint and verify the linked source evidence."
+      a: "Emulator runs use a TF-IDF + logistic-regression classifier trained on about 9,100 labelled log lines (LogHub Android plus templated failures). Grouped 5-fold cross-validation gives 78% accuracy and 0.77 macro F1 on that mixed dataset, which is not field accuracy. Every finding links the exact log lines, so treat the category as a triage hint and check the evidence."
     },
     {
       q: "How is Sarvam AI integrated into the testing workflow?",
-      a: "Sarvam translation and Bulbul TTS are provider-backed features that require a server-side SARVAM_API_KEY. Remediation text currently comes from deterministic rule-based templates; BharatSim does not claim a generative Sarvam root-cause diagnosis."
+      a: "Sarvam is in the core flow. Speak-to-Test sends your voice note to Saaras (speech-to-text) and your request to sarvam-105b, which returns a structured test plan that BharatSim validates and capability-checks before anything runs. After a run, Sarvam explains the measured evidence for a developer, product manager or public-service official, translates it (Hindi, Tamil, Marathi) and reads it aloud with Bulbul. Raw logcat is never sent; secrets and personal data are redacted first."
     }
   ];
 
@@ -45,7 +45,7 @@ export default function LandingPage({
     {
       icon: <Smartphone size={22} />,
       title: "Realistic Device Personas",
-      desc: "Test on emulated budget Android profiles — 2GB RAM, low-end CPUs, constrained storage — matching devices real Indian users own."
+      desc: "Test on emulated budget Android profiles: 2 GB RAM, 2 cores, 720p, battery saver and nearly full storage, like the phones many Indian users own."
     },
     {
       icon: <Wifi size={22} />,
@@ -70,14 +70,24 @@ export default function LandingPage({
     {
       icon: <Sparkles size={22} />,
       title: "Sarvam AI Integration",
-      desc: "Speak your test scenario in natural language. Get findings explained in Indian languages with Bulbul TTS audio narration."
+      desc: "Findings explained for developers, product managers or public-service officials, in Hindi, Tamil or Marathi, with Bulbul voice."
+    },
+    {
+      icon: <Mic size={22} />,
+      title: "Speak-to-Test",
+      desc: "Describe the bug in Hindi, Hinglish or Tamil by voice or text. Sarvam turns it into a validated test plan and tells you what the emulator cannot simulate."
+    },
+    {
+      icon: <ShieldCheck size={22} />,
+      title: "FixProof",
+      desc: "Run the same scenario on the old and new build. BharatSim says Fixed and verified only when the measured assertions pass, never because a change looks right."
     }
   ];
 
   const workflowSteps = [
     { num: "1", title: "Upload APK or Submit Logcat", desc: "Upload your Android APK for emulator testing, or paste logcat output directly for instant ML analysis." },
-    { num: "2", title: "Select Device Persona", desc: "Choose from Budget Android, Mid-Range, Rural 2G, Transit 3G or build a custom persona." },
-    { num: "3", title: "Configure Network Environment", desc: "Set bandwidth limits, latency, jitter, and packet loss to replicate real Indian connectivity." },
+    { num: "2", title: "Select Device Persona", desc: "Choose Budget Android, Edge Village, Crowded Station, Congested Urban 4G, or build a custom persona." },
+    { num: "3", title: "Configure Network Environment", desc: "Latency, bandwidth, packet loss, resets and outages are applied through a shaping proxy, then compared with a baseline run." },
     { num: "4", title: "Execute & Collect Telemetry", desc: "BharatSim runs your app on a real emulator, collects network traces, logcat and performance signals." },
     { num: "5", title: "Review Failure Analysis", desc: "ML classifier categorizes failures. Each finding links to source evidence in the actual logcat." },
     { num: "6", title: "Get Bharat Readiness Score", desc: "Transparent score computed from real measurements. Actionable recommendations with multilingual audio support." }
@@ -87,7 +97,7 @@ export default function LandingPage({
     { number: "5+", label: "Device Personas" },
     { number: "4", label: "Network Profiles" },
     { number: "<1ms", label: "ML Inference" },
-    { number: "100%", label: "Evidence-Backed" }
+    { number: "3", label: "Indian languages via Sarvam" }
   ];
 
   return (
@@ -134,7 +144,7 @@ export default function LandingPage({
               { tag: "ML Engine", text: "Zero-DLL TF-IDF Failure Classifier · < 1ms Inference" },
               { tag: "Sarvam AI", text: "Bulbul TTS · Hindi · Tamil · Telugu · Kannada" },
               { tag: "Scoring", text: "Bharat Readiness Score · Evidence-Based · Transparent" },
-              { tag: "Network", text: "tc-netem Shaping · Bandwidth Cap · Jitter · Packet Drop" },
+              { tag: "Network", text: "Shaping proxy · Bandwidth cap · Jitter · Packet loss · Outages" },
             ].map((item) => (
               <span key={item.tag} className="marquee-pill">
                 <span className="pill-tag">{item.tag}</span>
