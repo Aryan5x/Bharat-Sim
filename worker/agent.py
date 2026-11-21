@@ -387,12 +387,12 @@ def run_job_smoke(base_url: str, token: str, serial: str, job: dict[str, Any], d
 
                 required_profile_values = ("latency_ms", "down_kbps", "up_kbps")
                 if all(isinstance(profile.get(key), (int, float)) for key in required_profile_values):
-                    runner_command.extend([
-                        "--network-latency-ms", str(int(profile["latency_ms"])),
-                        "--network-down-kbps", str(int(profile["down_kbps"])),
-                        "--network-up-kbps", str(int(profile["up_kbps"])),
-                        "--network-loss-pct", str(float(profile.get("packet_loss_pct", 0))),
-                    ])
+                    # A baseline persona uses zero bandwidth targets to mean
+                    # "unshaped/full speed". The runner's explicit CLI overrides
+                    # accept only positive caps, so omit those overrides for the
+                    # baseline and let the full persona profile drive condition
+                    # planning (which records the control-plane reset/readback).
+                    runner_command.extend(persona_network_cli_args(job))
             try:
                 completed = subprocess.run(
                     runner_command, env=env, capture_output=True, text=True, timeout=360, check=False,
