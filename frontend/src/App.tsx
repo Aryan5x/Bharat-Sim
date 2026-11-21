@@ -38,7 +38,6 @@ import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from 
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
-import CapabilityPanel from "./components/CapabilityPanel";
 import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
 import type { SubmitRunOptions } from "./components/SpeakToTestView";
@@ -490,6 +489,7 @@ export default function App() {
                         </div>
                       )}
                       <textarea
+                        aria-label="Android logcat evidence"
                         disabled={previewMode}
                         value={logText}
                         onChange={(e) => setLogText(e.target.value)}
@@ -618,7 +618,7 @@ export default function App() {
                       )}
                     </section>
 
-                    <CapabilityPanel capabilities={capabilities} loading={loading} />
+                    
                   </div>
                 </div>
               }
