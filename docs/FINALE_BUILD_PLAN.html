@@ -1,0 +1,124 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>BharatSim Finale Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600;7..72,700&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 portrait; margin: 0; }
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+html,body{margin:0;background:#fff;}
+body{font-family:"Literata",Georgia,serif;color:#111;font-size:9.4px;line-height:13.2px;}
+.page{width:794px;min-height:1100px;padding:28px 44px 16px;}
+.kicker{font-size:8.4px;letter-spacing:.05em;color:#555;margin-bottom:2px;}
+h1{margin:0;font-size:16.5px;line-height:21px;font-weight:700;color:#a100e3;letter-spacing:.01em;text-transform:uppercase;}
+.rule{height:3px;background:#a100e3;margin:4px 0 6px;}
+.team{display:flex;justify-content:space-between;gap:16px;font-size:9.1px;line-height:13px;margin-bottom:5px;}
+.team b{font-weight:700;}
+.what{margin:0 0 5px;font-size:9.6px;line-height:13.6px;}
+.what b{font-weight:700;}
+ol{margin:0;padding-left:20px;}
+ol>li{margin:0 0 5px;padding-left:2px;}
+ol>li::marker{font-weight:700;}
+.lead{font-weight:700;}
+ul{margin:2px 0 0;padding-left:14px;}
+ul li{margin:0 0 1px;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:2px;}
+.sub{font-weight:600;}
+table{width:100%;border-collapse:collapse;margin-top:3px;font-size:8.9px;line-height:12.2px;}
+th{text-align:left;font-weight:700;border-bottom:1.5px solid #a100e3;padding:2px 6px 3px 0;}
+td{border-bottom:1px solid #e3d6ec;padding:2.5px 6px 2.5px 0;vertical-align:top;}
+tr:last-child td{border-bottom:0;}
+.st{font-weight:700;white-space:nowrap;}
+.note{margin-top:4px;font-size:8.5px;line-height:11.8px;color:#444;border-top:1px solid #e3d6ec;padding-top:4px;}
+</style></head><body><div class="page">
+
+<div class="kicker">hackFront India Grand Finale · IIIT Delhi · 21–22 November 2026 · revised for Mentor Round 1</div>
+<h1>Step Zero: Product Audit and Finale Build Plan</h1>
+<div class="rule"></div>
+<div class="team">
+  <div><b>Team Deccans</b>: Ronak Jain (Lead), Aryan Sharma, Kaustubh Dua, Avi Negi, Vanshika Yadav</div>
+  <div><b>Problem statement T1.2</b>: The Cheap Phone Test</div>
+</div>
+<p class="what"><b>BharatSim</b> is a cloud test lab for Android apps. A developer uploads an APK, picks a Bharat persona, and BharatSim runs it on a real budget-phone emulator under Indian network conditions and on a normal baseline. It then reports crashes, freezes, jank, slow starts and connectivity failures with log evidence, a Bharat Readiness Score, and an explanation in Indian languages. We are building on our submitted prototype, not starting a new idea.</p>
+
+<ol>
+<li><span class="lead">Where you are:</span> what works in the prototype today, and what is mocked, hardcoded or missing (live build checked 21 Nov, 14:46 IST).
+  <div class="two">
+    <div><span class="sub">Works</span>
+      <ul>
+        <li>4 Bharat personas and a category-aware <b>risk planner</b>, with the <b>Interaction Hunter</b> (pairwise condition hypotheses)</li>
+        <li><b>Failure DNA</b>: logcat paste analysis with rule-based fingerprints, secret redaction and a heuristic BharatScore</li>
+        <li>APK zip and size checks, a lease-based worker protocol, and an ADB smoke runner proven in CI on a fixture app</li>
+        <li>React dashboard, FastAPI backend, optional Supabase Auth code</li>
+      </ul></div>
+    <div><span class="sub">Mocked, hardcoded or missing</span>
+      <ul>
+        <li>No database on the live build (<i>database: unavailable</i>), so uploads, runs and history are off</li>
+        <li>No worker is connected, so no real execution happens live</li>
+        <li>Auth is not verified end to end; Sarvam is disabled</li>
+        <li>Scores are hardcoded rules, with no ML, no baseline comparison and no anomaly detection</li>
+        <li>Packet loss and CPU limits are unsupported; there is no PDF report, sharing or evaluator walkthrough</li>
+      </ul></div>
+  </div>
+</li>
+
+<li><span class="lead">Where you will be:</span> the exact features, flows and integrations working by 12 PM on 22 November.
+  <ul>
+    <li><b>Primary flow, live end to end:</b> sign up or sign in (Supabase Auth, password recovery) → drag-and-drop APK upload into private storage (signature, structure and size checks; package, version and min/target SDK extracted) → pick a persona → the job is queued → a worker runs it on a real Android 11 emulator (2 GB RAM, 720p) → live stages → a report comparing baseline and constrained runs</li>
+    <li><b>Personas applied for real:</b>
+      <ul>
+        <li><b>Budget Android:</b> 2 GB RAM, Android 11, 720p, battery saver, low storage</li>
+        <li><b>Edge Village:</b> about 450 ms latency, about 8% loss emulated as TCP retransmission stalls and resets, restricted bandwidth</li>
+        <li><b>Crowded Station:</b> congested 3G</li>
+        <li><b>Congested Urban 4G:</b> variable bandwidth with dropouts</li>
+      </ul>
+      Shaping runs through a measured host-side proxy (EDGE verified at 480 kbps in testing), with an airplane-mode drop and recovery</li>
+    <li><b>Telemetry (adb, dumpsys, gfxinfo, logcat), each value tied to its run and timestamp:</b>
+      <ul>
+        <li>cold start and time to first frame</li>
+        <li>jank and frame time</li>
+        <li>crashes, ANRs and OOMs</li>
+        <li>memory</li>
+        <li>network failures, timeouts and recovery time</li>
+        <li>data transferred</li>
+      </ul>
+      Automated exploration runs adb monkey restricted to the app</li>
+    <li><b>ML (scikit-learn):</b>
+      <ul>
+        <li>a TF-IDF + logistic regression failure classifier (crash, ANR, OOM, network, storage), trained by <i>scripts/train_classifier.py</i> on LogHub Android logs with versioned models and real held-out metrics</li>
+        <li>baseline-vs-constrained anomaly detection (z-score/IQR plus IsolationForest)</li>
+        <li>a transparent Bharat Readiness Score with category scores and evidence links</li>
+      </ul></li>
+    <li><b>Reports:</b> PDF and JSON export, secure share links, history and comparison; a clearly labelled <b>evaluator walkthrough</b> with two scenarios (UPI checkout timeout; quick-commerce OOM)</li>
+    <li><b>Security, deployed on Vercel with a Supabase backend:</b> row-level security and tenant isolation, signed URLs, rate limits, CSP, audit log, worker token auth; ArgosX baseline scan by midnight, final scan by 11 AM, with a remediation log</li>
+  </ul>
+</li>
+
+<li><span class="lead">Your user segments:</span> the primary segment plus two more.
+  <table>
+    <tr><th style="width:27%">Segment</th><th style="width:27%">Their version of the problem</th><th style="width:31%">Use cases</th><th>Status by 12 PM</th></tr>
+    <tr><td><b>Primary:</b> small Indian app teams (startup developers and QA) with no device lab</td><td>Can't afford dozens of cheap phones; users uninstall apps that fail on 2G/3G and 2 GB phones</td><td>(1) Test an APK on Bharat personas before release (2) Find crashes and slow starts, with evidence and fixes</td><td class="st">Working</td></tr>
+    <tr><td><b>2:</b> founders and PMs who aren't technical, or aren't comfortable in English</td><td>Can't read logs, and need a clear ship/no-ship decision</td><td>(1) Read the verdict and fixes in Hindi, Tamil or Marathi (2) Listen to the report as audio</td><td class="st">Working (new)</td></tr>
+    <tr><td><b>3:</b> app agencies, and vendors of government and Digital India apps</td><td>Must prove an app works for every citizen, on every release</td><td>(1) Plan tests by app category and journey (risk planner) (2) Compare reports across releases; share reports with clients</td><td class="st">Working: planner, compare, share</td></tr>
+  </table>
+</li>
+
+<li><span class="lead">Your partner tech choice:</span> <b>Sarvam AI</b>, deepened from an optional, disabled translation into every report. <span class="sub">Product need:</span> Bharat's users and many of the people who decide whether to ship are not English-first, and a test report only helps if the decision-maker understands it. In the core flow, visible in the demo:
+  <ul>
+    <li>the Sarvam LLM (sarvam-105b) turns ML-classified findings and evidence into what happened, why, user impact and fixes</li>
+    <li>Sarvam Translate renders the full report in Hindi, Tamil and Marathi, keeping technical identifiers</li>
+    <li>Sarvam Bulbul TTS plays it as audio</li>
+  </ul>
+  All three were verified live with our key on 21 Nov.</li>
+
+<li><span class="lead">Your definition of done:</span> an evaluator can open our live URL, sign in, upload an APK, run it on a Bharat persona on a real constrained emulator, and get a genuine, ML-classified report against a baseline run, with evidence, a readiness score, and a Sarvam explanation they can read and hear in Hindi, without our help.</li>
+</ol>
+
+<div class="note"><b>Honest scope notes:</b>
+  <ul>
+    <li>The emulator worker runs on our team laptop and connects to the live API, because Vercel cannot host emulators</li>
+    <li>Emulator console throttling did not slow TCP traffic in our tests, so shaping is enforced by a measured proxy</li>
+    <li>Network presets follow documented emulator values (EDGE, UMTS) rather than "TRAI-calibrated" figures until a cited field source is added</li>
+    <li><i>Stretch:</i> an Android companion app, a Neo4j failure graph and a CI webhook</li>
+  </ul>
+</div>
+</div></body></html>

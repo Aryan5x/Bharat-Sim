@@ -383,33 +383,49 @@ def validate_apk_archive(path: Path) -> None:
         raise HTTPException(status_code=415, detail="Uploaded APK is not a valid ZIP archive")
 
 PERSONAS: dict[str, dict[str, Any]] = {
+    # Each persona is applied for real by the worker: device settings over adb, and
+    # network shaping through the worker's host proxy (bandwidth, latency, loss
+    # emulated as TCP retransmission stalls, connection resets, drops).
     "budget-android": {
-        "id": "budget-android", "name": "Budget Android", "device": "Android 10 · 2 GB RAM",
-        "ram_mb": 2048, "storage_free_mb": 600, "network": "unstable-4g",
-        "latency_ms": 180, "down_kbps": 1200, "up_kbps": 350, "packet_loss_pct": 2,
-        "battery_saver": True, "risk": "high",
-        "description": "Constrained memory and storage with variable mobile connectivity.",
+        "id": "budget-android", "name": "Budget Android", "device": "Android 11 · 2 GB RAM · 720p",
+        "ram_mb": 2048, "storage_free_mb": 300, "fill_storage": True, "network": "budget-4g",
+        "latency_ms": 120, "delay_ms": [80, 160], "down_kbps": 2000, "up_kbps": 600, "packet_loss_pct": 0,
+        "reset_pct": 0, "drop_seconds": 0, "battery_saver": True, "risk": "high",
+        "expected_risks": ["oom", "storage", "anr", "slow cold start"],
+        "cpu_constraint": "not applied: the emulator exposes no per-app CPU throttle; reported as unsupported",
+        "description": "2 GB RAM phone on Android 11 with battery saver on and only about 300 MB of storage left.",
     },
     "edge-village": {
-        "id": "edge-village", "name": "Edge / weak signal", "device": "Android 11 · 3 GB RAM",
-        "ram_mb": 3072, "storage_free_mb": 900, "network": "high-latency",
-        "latency_ms": 450, "down_kbps": 256, "up_kbps": 96, "packet_loss_pct": 8,
-        "battery_saver": True, "risk": "critical",
-        "description": "Slow throughput, high latency and intermittent packet loss.",
+        "id": "edge-village", "name": "Edge Village", "device": "Android 11 · 2 GB RAM · 720p",
+        "ram_mb": 2048, "storage_free_mb": 900, "fill_storage": False, "network": "rural-2g",
+        "latency_ms": 450, "delay_ms": [350, 550], "down_kbps": 256, "up_kbps": 96, "packet_loss_pct": 8,
+        "reset_pct": 1.5, "drop_seconds": 15, "battery_saver": True, "risk": "critical",
+        "expected_risks": ["network timeouts", "offline crash", "retry storms"],
+        "description": "Rural tower at the edge of coverage: about 450 ms latency, 8% loss, 256 kbps and a 15 s outage.",
     },
-    "storage-pressure": {
-        "id": "storage-pressure", "name": "Low storage", "device": "Android 10 · 2 GB RAM",
-        "ram_mb": 2048, "storage_free_mb": 180, "network": "moderate-4g",
-        "latency_ms": 90, "down_kbps": 2500, "up_kbps": 700, "packet_loss_pct": 0,
-        "battery_saver": False, "risk": "high",
-        "description": "Small free-storage budget to expose cache and download assumptions.",
+    "crowded-station": {
+        "id": "crowded-station", "name": "Crowded Station", "device": "Android 11 · 2 GB RAM · 720p",
+        "ram_mb": 2048, "storage_free_mb": 900, "fill_storage": False, "network": "congested-3g",
+        "latency_ms": 375, "delay_ms": [150, 600], "down_kbps": 384, "up_kbps": 128, "packet_loss_pct": 3,
+        "reset_pct": 0.5, "drop_seconds": 0, "battery_saver": False, "risk": "high",
+        "expected_risks": ["network timeouts", "slow loads", "jank while waiting"],
+        "description": "Busy railway platform on 3G: 384 kbps shared bandwidth, 150-600 ms jitter and 3% loss.",
+    },
+    "urban-4g": {
+        "id": "urban-4g", "name": "Congested Urban 4G", "device": "Android 11 · 2 GB RAM · 720p",
+        "ram_mb": 2048, "storage_free_mb": 900, "fill_storage": False, "network": "congested-4g",
+        "latency_ms": 200, "delay_ms": [60, 350], "down_kbps": 3000, "up_kbps": 1000, "variable_kbps": [600, 6000],
+        "packet_loss_pct": 1, "reset_pct": 1.5, "drop_seconds": 8, "battery_saver": False, "risk": "medium",
+        "expected_risks": ["intermittent failures", "connection resets", "recovery"],
+        "description": "City 4G under load: bandwidth swinging between 0.6 and 6 Mbps, resets, and an 8 s dropout.",
     },
     "baseline": {
-        "id": "baseline", "name": "Baseline", "device": "Android 14 · 6 GB RAM",
-        "ram_mb": 6144, "storage_free_mb": 8000, "network": "good-4g",
-        "latency_ms": 35, "down_kbps": 12000, "up_kbps": 3000, "packet_loss_pct": 0,
-        "battery_saver": False, "risk": "low",
-        "description": "Control profile for comparison; still runs only when a worker is available.",
+        "id": "baseline", "name": "Baseline", "device": "Android 11 · 2 GB RAM · 720p",
+        "ram_mb": 2048, "storage_free_mb": 4000, "fill_storage": False, "network": "unshaped",
+        "latency_ms": 0, "delay_ms": [0, 0], "down_kbps": 0, "up_kbps": 0, "packet_loss_pct": 0,
+        "reset_pct": 0, "drop_seconds": 0, "battery_saver": False, "risk": "low",
+        "expected_risks": [],
+        "description": "No constraints. Every test also runs this profile so each persona is compared against it.",
     },
 }
 
@@ -450,6 +466,7 @@ class WorkerClaimRequest(BaseModel):
 
 class WorkerHeartbeatRequest(BaseModel):
     lease_token: str = Field(min_length=32, max_length=200)
+    stage: str | None = Field(default=None, max_length=160)
 
 class WorkerResultRequest(BaseModel):
     lease_token: str = Field(min_length=32, max_length=200)
@@ -1606,6 +1623,9 @@ def worker_heartbeat(run_id: str, request: Request, payload: WorkerHeartbeatRequ
             "UPDATE workers SET last_seen=?,status='running',current_run_id=? WHERE id=(SELECT worker_id FROM runs WHERE id=?)",
             (now_text, run_id, run_id),
         )
+        if payload.stage:
+            stage = re.sub(r"[^\w .,:%()+/-]", "", payload.stage)[:160]
+            record_run_event(conn, run_id, "worker_stage", "worker", None, {"stage": stage})
     return {"ok": True, "lease_until": new_lease}
 
 

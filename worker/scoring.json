@@ -1,0 +1,19 @@
+{
+  "cold_starts": 3,
+  "settle_seconds": 4,
+  "monkey_events": 150,
+  "monkey_throttle_ms": 250,
+  "monkey_seed": 2026,
+  "cold_start_warn_ms": 2000,
+  "cold_start_fail_ms": 5000,
+  "memory_warn_mb": 200,
+  "memory_fail_mb": 350,
+  "weights": {
+    "startup": 20,
+    "stability": 30,
+    "ui": 15,
+    "memory": 10,
+    "network": 15,
+    "recovery": 10
+  }
+}

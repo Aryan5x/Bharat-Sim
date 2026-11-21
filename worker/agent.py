@@ -150,6 +150,23 @@ def redact_report_text(value: Any) -> Any:
 
 def annotate_execution_scope(report: dict[str, Any], job: dict[str, Any]) -> None:
     """Make the distinction between smoke execution and constraint validation explicit."""
+    if str(report.get("engine", "")).startswith("bharatsim-engine"):
+        cons = report.get("constrained") or {}
+        net = cons.get("network") or {}
+        report["execution_scope"] = "baseline_vs_persona_emulator_run"
+        report["requested_persona_id"] = str(job.get("persona_id") or "unknown")
+        report["network_constraints_applied"] = bool(net.get("connections"))
+        report["constraints_applied"] = bool(cons.get("conditions_applied"))
+        report["constraint_verification"] = (
+            f"{net.get('connections', 0)} app connection(s) and {net.get('bytes_down', 0)} bytes went through the "
+            "shaping proxy under the persona" if net.get("connections") else
+            "no app traffic passed the shaping proxy; the app may not use the network or may bypass the system proxy"
+        )
+        report["result_interpretation"] = (
+            "Real emulator execution on a baseline and the selected persona. Metrics come from adb, dumpsys, gfxinfo, "
+            "logcat and the shaping proxy; CPU throttling is not applied."
+        )
+        return
     report["execution_scope"] = "install_launch_logcat_smoke"
     report["result_interpretation"] = (
         "Smoke procedure completed; this does not prove the app is healthy "
@@ -225,17 +242,48 @@ def persona_network_cli_args(job: dict[str, Any]) -> list[str]:
     ]
 
 
+_SHAPER = None
+
+
+def shaper():
+    """One host shaping proxy per worker process; the emulator reaches it at 10.0.2.2."""
+    global _SHAPER
+    if _SHAPER is None:
+        from worker.shaper import Shaper
+        _SHAPER = Shaper(host="127.0.0.1", port=int(os.getenv("BHARATSIM_SHAPER_PORT", "8899")))
+        _SHAPER.start()
+    return _SHAPER
+
+
 def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duration: int) -> None:
+    from worker.device import Device
+    from worker.engine import execute
+
     run_id = str(job["id"])
     lease_token = str(job["lease_token"])
     stop_heartbeat = threading.Event()
+    last_stage = {"text": "Claimed by worker", "sent": 0.0}
+
+    def send(stage: str | None = None) -> None:
+        payload: dict[str, Any] = {"lease_token": lease_token}
+        if stage:
+            payload["stage"] = stage
+        request_json(base_url, token, str(job["heartbeat_url"]), payload, timeout=15)
 
     def heartbeat() -> None:
-        while not stop_heartbeat.wait(45):
+        while not stop_heartbeat.wait(30):
             try:
-                request_json(base_url, token, str(job["heartbeat_url"]), {"lease_token": lease_token}, timeout=15)
+                send()
             except Exception as exc:
                 print(f"heartbeat warning for {run_id}: {exc}", file=sys.stderr, flush=True)
+
+    def stage(text: str) -> None:
+        print(f"[{run_id[:8]}] {text}", flush=True)
+        last_stage["text"] = text
+        try:
+            send(text)  # also renews the lease
+        except Exception as exc:
+            print(f"stage report warning: {exc}", file=sys.stderr, flush=True)
 
     heartbeat_thread = threading.Thread(target=heartbeat, name="lease-heartbeat", daemon=True)
     heartbeat_thread.start()
@@ -243,81 +291,41 @@ def run_job(base_url: str, token: str, serial: str, job: dict[str, Any], duratio
         with tempfile.TemporaryDirectory(prefix="bharatsim-") as temp:
             work = Path(temp)
             apk = work / "input.apk"
-            artifact_dir = work / "artifacts"
+            stage("Downloading APK")
             download_apk(base_url, token, job, apk)
-            env = os.environ.copy()
-            env.update({
-                "BHARATSIM_ENABLE_LOCAL_APK_EXECUTION": "true",
-                "ANDROID_SERIAL": serial,
-            })
-            runner_command = [
-                sys.executable, str(RUNNER), str(apk),
-                "--duration", str(duration), "--out", str(artifact_dir),
-            ]
-            profile = job.get("persona_profile")
-            if isinstance(profile, dict):
-                profile_path = work / "persona_profile.json"
-                profile_path.write_text(json.dumps(profile), encoding="utf-8")
-                runner_command.extend(["--persona-profile", str(profile_path)])
-
-                required_profile_values = ("latency_ms", "down_kbps", "up_kbps")
-                if all(isinstance(profile.get(key), (int, float)) for key in required_profile_values):
-                    runner_command.extend([
-                        "--network-latency-ms", str(int(profile["latency_ms"])),
-                        "--network-down-kbps", str(int(profile["down_kbps"])),
-                        "--network-up-kbps", str(int(profile["up_kbps"])),
-                        "--network-loss-pct", str(float(profile.get("packet_loss_pct", 0))),
-                    ])
-            try:
-                completed = subprocess.run(
-                    runner_command, env=env, capture_output=True, text=True, timeout=360, check=False,
-                )
-            except subprocess.TimeoutExpired as timeout_exc:
-                print(f"runner timed out after 360s for run {run_id}; invoking safe cleanup fallback", file=sys.stderr, flush=True)
-                reset_target_safely(serial)
-                raise WorkerError("Android smoke runner timed out after 360 seconds") from timeout_exc
-
-            reports = list(artifact_dir.glob("*.report.json"))
-            if reports:
-                report = json.loads(reports[0].read_text(encoding="utf-8"))
-            else:
-                report = {"status": "failed", "error": "Runner did not produce a report", "runner_return_code": completed.returncode}
-            report.pop("device_serial", None)
-            report.pop("logcat_artifact", None)
-            # This metadata deliberately prevents a smoke result from being read as a health pass.
+            report = execute(apk, job, Device(serial), shaper(), stage)
+            if report.get("apk_sha256") != job.get("apk_sha256"):
+                raise WorkerError("Downloaded APK hash does not match the queued artifact")
             annotate_execution_scope(report, job)
-            # Keep the report well below the API's 250 KB JSON limit even with non-ASCII log text.
-            for step in report.get("steps", []):
-                if isinstance(step, dict):
-                    for field in ("stdout_tail", "stderr_tail"):
-                        if field in step:
-                            step[field] = str(step[field])[-800:]
-            log_files = list(artifact_dir.glob("*.logcat.txt"))
-            if log_files:
-                # Full artifact storage is a separate production concern.
-                report["logcat_tail"] = log_files[0].read_text(encoding="utf-8", errors="replace")[-30_000:]
-            report["runner_return_code"] = completed.returncode
-            if completed.stderr:
-                report["runner_stderr_tail"] = completed.stderr[-4_000:]
             # Logcat and subprocess output can contain bearer tokens or app secrets.
-            # Redact report text before serializing it into the API's persisted result.
             report = redact_report_text(report)
+            encoded = json.dumps(report)
+            if len(encoded.encode("utf-8")) > 240_000:
+                for side in ("baseline", "constrained"):
+                    for f in report.get(side, {}).get("findings", []):
+                        f["evidence"] = f.get("evidence", [])[:3]
+                    report.get(side, {}).pop("launches", None)
             final_status = "completed" if report.get("status") == "completed" else "failed"
-            error = None if final_status == "completed" else str(report.get("error") or "Android smoke runner failed")[:2000]
+            error = None if final_status == "completed" else str(report.get("error") or "Execution failed")[:2000]
             request_json(base_url, token, str(job["result_url"]), {
                 "lease_token": lease_token, "status": final_status, "result": report, "error": error,
             }, timeout=30)
-            print(json.dumps({"run_id": run_id, "status": final_status, "apk_sha256": job.get("apk_sha256")}), flush=True)
+            print(json.dumps({"run_id": run_id, "status": final_status, "score": report.get("readiness", {}).get("overall")}), flush=True)
     except Exception as exc:
         try:
             reset_target_safely(serial)
         except Exception as reset_exc:
             print(f"cleanup fallback error for {run_id}: {reset_exc}", file=sys.stderr, flush=True)
+        try:
+            from worker.device import Device as _D
+            _D(serial).set_proxy(None)
+        except Exception:
+            pass
         # A failed report submission is intentionally not disguised as a successful run.
         try:
             request_json(base_url, token, str(job["result_url"]), {
                 "lease_token": lease_token, "status": "failed",
-                "result": {"status": "failed", "error": str(exc)[:2000]},
+                "result": {"status": "failed", "error": str(exc)[:2000], "failed_stage": last_stage["text"]},
                 "error": str(exc)[:2000],
             }, timeout=20)
         except Exception as submit_exc:
@@ -350,8 +358,12 @@ def main() -> int:
     if os.getenv("BHARATSIM_ENABLE_LOCAL_APK_EXECUTION") != "true":
         print("Set BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true only after isolating the worker", file=sys.stderr)
         return 2
-    if not RUNNER.is_file():
-        print(f"Runner not found: {RUNNER}", file=sys.stderr)
+    try:
+        from worker import ml
+        ml.model()  # load (or train) the failure classifier before claiming work
+        shaper()
+    except Exception as exc:
+        print(f"worker setup failed: {exc}", file=sys.stderr)
         return 2
 
     print(f"BharatSim worker {worker_id} starting; target device is explicitly configured.", flush=True)
