@@ -663,8 +663,11 @@ export default function App() {
               path="/speak"
               element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
             />
+            <Route path="/speak-to-test" element={<Navigate to="/speak" replace />} />
             <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
+            <Route path="/fix-proof" element={<Navigate to="/fixproof" replace />} />
             <Route path="/connect" element={<ConnectLaptopView previewMode={previewMode} />} />
+            <Route path="/connect-laptop" element={<Navigate to="/connect" replace />} />
 
             {/* Comparative Telemetry & Anomaly Analysis route */}
             <Route

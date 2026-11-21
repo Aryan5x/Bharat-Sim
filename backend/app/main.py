@@ -1290,6 +1290,23 @@ def analyze_log_text(text: str, persona_id: str = "budget-android") -> dict[str,
     }
 
 _FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+_INSTALL_PUBLIC = Path(__file__).resolve().parents[2] / "frontend" / "public" / "install"
+
+
+@app.get("/install/windows.ps1")
+def get_windows_installer():
+    target = (_FRONTEND_DIST / "install" / "windows.ps1") if (_FRONTEND_DIST / "install" / "windows.ps1").is_file() else (_INSTALL_PUBLIC / "windows.ps1")
+    if target.is_file():
+        return FileResponse(target, media_type="text/plain; charset=utf-8")
+    raise HTTPException(status_code=404, detail="windows.ps1 installer script not found")
+
+
+@app.get("/install/unix.sh")
+def get_unix_installer():
+    target = (_FRONTEND_DIST / "install" / "unix.sh") if (_FRONTEND_DIST / "install" / "unix.sh").is_file() else (_INSTALL_PUBLIC / "unix.sh")
+    if target.is_file():
+        return FileResponse(target, media_type="text/plain; charset=utf-8")
+    raise HTTPException(status_code=404, detail="unix.sh installer script not found")
 
 
 @app.get("/")
