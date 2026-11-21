@@ -111,3 +111,37 @@ input,select,textarea{accent-color:#75aaff}
   .api-state{font-size:9px}
   .theme-toggle{flex:0 0 34px}
 }
+
+:root[data-theme="light"] .auth-screen{background:#f4f7fc;color:#17243a}
+:root[data-theme="light"] .auth-card{background:#fff;border:1px solid #dce4f0;box-shadow:0 24px 70px rgba(22,40,70,.10)}
+:root[data-theme="light"] .auth-brand b,
+:root[data-theme="light"] .auth-card h1,
+:root[data-theme="light"] .auth-card label{color:#17243a}
+:root[data-theme="light"] .auth-copy,
+:root[data-theme="light"] .auth-foot{color:#61708a}
+:root[data-theme="light"] .auth-switch,
+:root[data-theme="light"] .auth-demo-button{color:#2458b4}
+:root[data-theme="light"] .auth-session-bar,
+:root[data-theme="light"] .public-preview-bar{background:#eaf1ff;border-color:#c8d9fb;color:#1d3d70}
+:root[data-theme="light"] .modal-backdrop{background:rgba(15,23,42,.42)}
+:root[data-theme="light"] .modal-dialog{background:#fff;border-color:#dce4f0;color:#17243a;box-shadow:0 28px 80px rgba(15,23,42,.18)}
+:root[data-theme="light"] .modal-header{border-color:#e4eaf3}
+:root[data-theme="light"] .modal-header h2,
+:root[data-theme="light"] .modal-header h3,
+:root[data-theme="light"] .modal-body h4{color:#17243a}
+:root[data-theme="light"] .meta-card,
+:root[data-theme="light"] .scenario-log-preview,
+:root[data-theme="light"] .sarvam-insight-box,
+:root[data-theme="light"] .anomaly-card,
+:root[data-theme="light"] .verdict-banner{background:#f7f9fd;border-color:#dce4f0;color:#263750}
+:root[data-theme="light"] .scenario-desc,
+:root[data-theme="light"] .anomaly-explanation,
+:root[data-theme="light"] .audio-label{color:#52627b}
+:root[data-theme="light"] .evaluator-tour-banner{background:linear-gradient(115deg,#f7faff,#edf3ff);border-color:#d6e2f5;color:#17243a}
+:root[data-theme="light"] .tour-content h3,
+:root[data-theme="light"] .scenario-btn-text b{color:#17243a}
+:root[data-theme="light"] .tour-content p,
+:root[data-theme="light"] .scenario-btn-text small{color:#61708a}
+:root[data-theme="light"] .tour-scenario-btn{background:#fff;border-color:#dce4f0;color:#263750}
+:root[data-theme="light"] .tour-scenario-btn:hover{border-color:#a9c3f3;background:#f3f7ff}
+:root[data-theme="light"] .audio-error{color:#b42318}
