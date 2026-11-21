@@ -1,12 +1,15 @@
 import { useState, type FormEvent, type DragEvent, type ChangeEvent } from "react";
 import { ArrowUpRight, CircleAlert, FlaskConical, LoaderCircle, UploadCloud } from "lucide-react";
 import type { Persona, Worker } from "../api";
+import CustomPersonaBuilder, { DEFAULT_CUSTOM_PERSONA, type CustomPersona } from "./CustomPersonaBuilder";
 
 interface UploadPanelProps {
   apk: File | null;
   setApk: (file: File | null) => void;
   selected: string;
   setSelected: (id: string) => void;
+  customPersona?: CustomPersona;
+  setCustomPersona?: (p: CustomPersona) => void;
   personas: Persona[];
   workers: Worker[];
   busy: boolean;
@@ -17,13 +20,15 @@ interface UploadPanelProps {
   onSubmit: (e: FormEvent) => Promise<void>;
 }
 
-const MAX_SIZE_BYTES = 150 * 1024 * 1024; // 150 MB
+const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB (private storage object limit)
 
 export default function UploadPanel({
   apk,
   setApk,
   selected,
   setSelected,
+  customPersona = DEFAULT_CUSTOM_PERSONA,
+  setCustomPersona = () => undefined,
   personas,
   workers,
   busy,
@@ -57,7 +62,7 @@ export default function UploadPanel({
     if (file.size > MAX_SIZE_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
       setApk(null);
-      setFileError(`File exceeds the 150 MB limit (${sizeMb} MB). Please choose a smaller APK.`);
+      setFileError(`File exceeds the 50 MB limit (${sizeMb} MB). Please choose a smaller APK.`);
       return;
     }
 
@@ -96,7 +101,7 @@ export default function UploadPanel({
         <div>
           <div className="section-kicker">02 / START A SESSION</div>
           <h2>New test run</h2>
-          <p>Upload an APK to register a run. Execution needs a worker.</p>
+          <p>Upload an APK, pick a persona, and the emulator lab runs it against a baseline.</p>
         </div>
         <div className="panel-icon">
           <UploadCloud size={19} />
@@ -126,7 +131,7 @@ export default function UploadPanel({
               ? `${(apk.size / 1024 / 1024).toFixed(1)} MB · Ready to upload`
               : "Choose an APK to enable run registration"}
           </small>
-          <span className="file-limit">{!uploadAvailable ? "APK registration unavailable" : directUploadAvailable ? "APK · Max 150 MB" : "APK · Max 4 MB"}</span>
+          <span className="file-limit">{!uploadAvailable ? "APK registration unavailable" : directUploadAvailable ? "APK · Max 50 MB" : "APK · Max 4 MB"}</span>
         </label>
 
         {apiStatus === "offline" && (
@@ -161,13 +166,18 @@ export default function UploadPanel({
           {personas.length === 0 ? (
             <option value="">No personas available</option>
           ) : (
-            personas.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name + " — " + p.device}
-              </option>
-            ))
+            <>
+              {personas.filter((p) => p.id !== "baseline").map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name + " — " + p.device}
+                </option>
+              ))}
+              <option value="custom">Custom persona — set your own RAM, screen and network</option>
+            </>
           )}
         </select>
+        <p className="field-hint">Every test also runs a normal baseline on the same emulator, so the report compares the two.</p>
+        {selected === "custom" && <CustomPersonaBuilder value={customPersona} onChange={setCustomPersona} />}
 
         <div className="run-warning">
           <CircleAlert size={16} />
@@ -175,8 +185,8 @@ export default function UploadPanel({
             {!uploadAvailable
               ? lockedReason + " No upload or test run will be attempted."
               : workers.some((w) => w.online)
-                ? "A worker is online. The run will only count as executed after it submits a report with evidence."
-                : "No worker heartbeat detected. This registers the APK; execution will wait for a worker and no test pass/failure is implied."}
+                ? "The emulator lab is online. Your APK will run on a baseline and on the selected persona, usually in 2 to 5 minutes."
+                : "The emulator lab is offline right now. Your APK is stored privately and the test starts as soon as the lab comes online; no result is shown until it actually runs."}
           </span>
         </div>
 
@@ -187,7 +197,7 @@ export default function UploadPanel({
         >
           {busy ? <LoaderCircle className="spin" size={16} /> : <FlaskConical size={16} />}
           {" "}
-          {busy ? "Working…" : "Start / Register test run"}
+          {busy ? "Working…" : "Start test"}
           <ArrowUpRight size={15} />
         </button>
       </form>

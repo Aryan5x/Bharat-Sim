@@ -466,7 +466,7 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("Only .apk files are supported");
   });
 
-  it("UploadPanel rejects files larger than 150 MB", async () => {
+  it("UploadPanel rejects files larger than 50 MB", async () => {
     const setApkMock = vi.fn();
     await act(async () => {
       root.render(
@@ -496,7 +496,7 @@ describe("Components tests with jsdom", () => {
     });
 
     expect(setApkMock).toHaveBeenCalledWith(null);
-    expect(container.textContent).toContain("exceeds the 150 MB limit");
+    expect(container.textContent).toContain("exceeds the 50 MB limit");
   });
 
   it("UploadPanel toggles dragging highlight class", async () => {

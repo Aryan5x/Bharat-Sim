@@ -82,6 +82,8 @@ def test_anomaly_detector_regressions():
     result = detect_regressions(baseline, constrained)
     assert result["regression_count"] >= 2
     assert 0 <= result["anomaly_score"] <= 100
+    memory_anomaly = next(item for item in result["anomalies"] if item["metric"] == "peak_memory_mb")
+    assert memory_anomaly["delta"] == 205
     metrics = [a["metric"] for a in result["anomalies"]]
     assert "cold_start_ms" in metrics
     assert "jank_percentage" in metrics
@@ -168,6 +170,10 @@ def test_analyze_logs_with_ml_enrichment(client):
     first_finding = data["findings"][0]
     assert "sarvam_explanation" in first_finding
     assert "code_remedy" in first_finding["sarvam_explanation"]
+    assert isinstance(first_finding["ml_classification"], dict)
+    assert first_finding["ml_classification"]["category"] == first_finding["kind"]
+    assert 0 <= first_finding["ml_classification"]["confidence"] <= 1
+    assert first_finding["classification_method"] == "ml_corroborated"
 
 
 
@@ -220,6 +226,8 @@ def test_run_comparison_uses_owner_scoped_persisted_telemetry(monkeypatch):
     assert result["constrained_metrics"] == {"jank_percentage": 36.0, "peak_memory_mb": 290.0}
     assert result["anomaly_detected"] is True
     assert 0 <= result["anomaly_score"] <= 100
+    memory_anomaly = next(item for item in result["anomalies"] if item["metric"] == "peak_memory_mb")
+    assert memory_anomaly["delta_pct"] == 222.2
 
 
 def test_run_comparison_hides_foreign_owner_run(monkeypatch):
@@ -258,3 +266,37 @@ def test_run_comparison_rejects_missing_measured_metrics(monkeypatch):
             _comparison_request("owner-a"),
         )
     assert exc.value.status_code == 422
+
+
+def test_sarvam_key_supports_legacy_server_variable(monkeypatch):
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.setenv("sarvam_api", "legacy-server-key-value-123")
+    assert main_module.get_sarvam_api_key() == "legacy-server-key-value-123"
+
+    monkeypatch.setenv("SARVAM_API_KEY", "preferred-server-key-value-456")
+    assert main_module.get_sarvam_api_key() == "preferred-server-key-value-456"
+
+
+def test_capabilities_enable_sarvam_when_legacy_server_key_is_configured(monkeypatch):
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.setenv("sarvam_api", "legacy-server-key-value-123")
+    data = main_module.capabilities()
+    assert data["sarvam_translation"] is True
+    assert data["sarvam_audio_tts"] is True
+
+
+def test_capabilities_disable_unconfigured_provider_and_database_features(monkeypatch):
+    monkeypatch.delenv("SARVAM_API_KEY", raising=False)
+    monkeypatch.delenv("sarvam_api", raising=False)
+    monkeypatch.setattr(main_module, "requires_persistent_database", lambda: True)
+    monkeypatch.setattr(main_module, "database_is_available", lambda: False)
+    monkeypatch.setattr(main_module, "worker_dispatch_configured", lambda: False)
+    monkeypatch.setattr(main_module, "STORAGE_ENABLED", False)
+
+    data = main_module.capabilities()
+    assert data["sarvam_audio_tts"] is False
+    assert data["sarvam_translation"] is False
+    assert data["run_comparison"] is False
+    assert data["apk_upload"] is False
+    assert data["max_upload_mb"] == main_module.MAX_UPLOAD_BYTES // (1024 * 1024)
+    assert data["android_execution"] is False
