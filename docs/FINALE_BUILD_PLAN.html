@@ -1,0 +1,207 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>BharatSim Finale Build Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+@page { size: A4 portrait; margin: 0; }
+:root{
+  /* light ink ramp */
+  --page:#ffffff; --raised:#f5f7fa; --line:rgba(17,24,39,.09); --line2:rgba(17,24,39,.16);
+  --t1:#111827; --t2:#4b5565; --t3:#6b7487;
+  /* one accent: signal amber */
+  --acc:#b45309; --acc-soft:#fdf3e7;
+}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+html,body{margin:0;background:var(--page);}
+body{font-family:"IBM Plex Sans","Segoe UI",Arial,sans-serif;color:var(--t1);font-size:9.6px;line-height:13px;}
+.page{width:794px;min-height:1100px;padding:28px 40px 16px;display:flex;flex-direction:column;}
+.mono{font-family:"IBM Plex Mono",Consolas,monospace;}
+p{margin:0;}
+ul{margin:0;padding-left:12px;}
+li{margin:0 0 1px;}
+li::marker{color:var(--t3);}
+
+/* header */
+.hdr{display:grid;grid-template-columns:1fr 268px;gap:24px;align-items:end;padding-bottom:8px;border-bottom:1px solid var(--line2);}
+.meta{font-size:9px;line-height:12px;color:var(--t3);margin-bottom:4px;}
+h1{margin:0;font-size:24px;line-height:28px;font-weight:500;letter-spacing:-.01em;}
+.team{margin-top:4px;color:var(--t2);}
+.team b{color:var(--t1);font-weight:500;}
+.ps{font-size:9.5px;line-height:13px;color:var(--t2);border-left:2px solid var(--acc);padding-left:8px;}
+.ps b{color:var(--t1);font-weight:500;}
+
+/* intro */
+.intro{display:grid;grid-template-columns:96px 1fr;gap:16px;padding:8px 0;border-bottom:1px solid var(--line);}
+.intro p{font-size:10px;line-height:14px;color:var(--t2);}
+.intro p b{color:var(--t1);font-weight:500;}
+
+/* sections */
+.sec{display:grid;grid-template-columns:96px 1fr;gap:16px;padding:8px 0;border-bottom:1px solid var(--line);}
+.sec:last-of-type{border-bottom:0;}
+.lbl .n{font-size:9px;color:var(--t3);display:block;line-height:12px;}
+.lbl h2{margin:2px 0 0;font-size:12px;line-height:16px;font-weight:500;}
+.lbl .sub{display:block;margin-top:4px;font-size:9px;line-height:12px;color:var(--t3);}
+h3{margin:0 0 4px;font-size:9.8px;line-height:13px;font-weight:600;}
+
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.k{color:var(--t1);font-weight:500;}
+.t2{color:var(--t2);}
+
+/* pipeline: the moment */
+.pipe{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid var(--line2);border-radius:8px;overflow:hidden;margin-bottom:8px;background:var(--raised);}
+.pipe div{padding:6px 8px;border-right:1px solid var(--line);position:relative;}
+.pipe div:last-child{border-right:0;background:var(--t1);color:#fff;}
+.pipe .i{font-size:8.5px;line-height:12px;color:var(--t3);}
+.pipe div:last-child .i{color:#cbd2dc;}
+.pipe b{display:block;font-weight:500;font-size:10px;line-height:14px;}
+.pipe small{display:block;font-size:8.5px;line-height:12px;color:var(--t2);}
+.pipe div:last-child small{color:#cbd2dc;}
+
+.spec{display:grid;grid-template-columns:repeat(3,1fr);column-gap:20px;row-gap:8px;}
+.span2{grid-column:span 2;}
+.spec>div{padding-top:8px;border-top:1px solid var(--line);}
+.spec .ml{background:var(--acc-soft);border-top:2px solid var(--acc);padding:8px 10px;border-radius:0 0 6px 6px;}
+.spec .ml h3 .mono{font-weight:400;color:var(--acc);font-size:8.5px;margin-left:6px;}
+.stretch{margin-top:8px;color:var(--t3);font-size:9px;line-height:12px;}
+.stretch b{color:var(--t2);font-weight:500;}
+
+/* signature: signal bars */
+.sig{display:inline-flex;align-items:flex-end;gap:1.5px;height:10px;margin-right:6px;vertical-align:-1px;}
+.sig i{display:block;width:2.5px;background:var(--line2);border-radius:1px;}
+.sig i:nth-child(1){height:3px}.sig i:nth-child(2){height:5px}.sig i:nth-child(3){height:7.5px}.sig i:nth-child(4){height:10px}
+.sig.s4 i{background:var(--acc);}
+.sig.s2 i:nth-child(-n+2){background:var(--acc);}
+
+/* table */
+table{width:100%;border-collapse:collapse;font-size:9.2px;line-height:12.5px;}
+th{font-family:"IBM Plex Mono",Consolas,monospace;font-weight:400;font-size:8.5px;color:var(--t3);text-align:left;padding:0 8px 4px 0;border-bottom:1px solid var(--line2);}
+td{padding:4px 8px 4px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--t2);}
+td:first-child{color:var(--t1);}
+tr:last-child td{border-bottom:0;}
+.status{white-space:nowrap;color:var(--t1);font-weight:500;}
+.status small{display:block;font-weight:400;color:var(--t3);white-space:normal;margin-top:2px;}
+
+.dod{border:1px solid var(--line2);border-left:3px solid var(--acc);border-radius:6px;padding:8px 12px;font-size:10px;line-height:14px;}
+.dod b{font-weight:500;}
+
+.foot{margin-top:auto;padding-top:8px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;font-size:9px;line-height:12px;color:var(--t3);}
+.foot b{color:var(--t2);font-weight:500;}
+code{font-family:"IBM Plex Mono",Consolas,monospace;font-size:9px;background:var(--raised);padding:0 3px;border-radius:4px;}
+</style></head><body><div class="page">
+
+<header class="hdr">
+  <div>
+    <div class="meta mono">hackFront India Grand Finale · Finale Build Plan · 21 Nov 2026</div>
+    <h1>BharatSim: the cheap phone test</h1>
+    <div class="team"><b>Team Deccans</b> · Ronak Jain (lead) · Aryan Sharma · Kaustubh Dua · Avi Negi · Vanshika Yadav</div>
+  </div>
+  <div class="ps"><b>Problem statement T1.2</b>: make Android apps work reliably on low-end devices and real Indian networks, by simulating device and network constraints and finding performance and connectivity failures</div>
+</header>
+
+<section class="intro">
+  <div class="lbl"><span class="n mono">00</span><h2>What it is</h2></div>
+  <p><b>BharatSim is a cloud test lab that shows how an Android app behaves on the phones and networks most Indians actually use.</b> A developer uploads an APK. We run it on a real Android emulator set up like a budget phone (2 GB RAM, 720p, low storage) on 2G, 3G, congested or dropping networks, and run it again on a normal baseline. It explores the app automatically, and ML classifies the crashes, freezes, jank, slow starts and network failures. Developers get a report they can fix from, and founders get the same verdict in Hindi or other Indian languages, with a voice summary. No device lab to buy.</p>
+</section>
+
+<section class="sec">
+  <div class="lbl"><span class="n mono">01</span><h2>Where we are</h2><span class="sub mono">Live build,<br>21 Nov 14:46 IST</span></div>
+  <div class="cols2">
+    <div><h3>Works today</h3>
+      <ul>
+        <li>A risk planner with 4 "Bharat" personas. It plans tests but does not run them</li>
+        <li>Logcat paste analysis using rule-based fingerprints and a heuristic score</li>
+        <li>APK structure and size checks</li>
+        <li>A local ADB runner with emulator latency and bandwidth shaping, proven only in CI on our own fixture app</li>
+      </ul></div>
+    <div><h3>Mocked, hardcoded or missing</h3>
+      <ul>
+        <li>No database on the live build (<code>database: unavailable</code>). APK upload and execution are off, and no worker is connected</li>
+        <li>Auth has never been verified end to end. Sarvam translation is disabled</li>
+        <li>Scores are hardcoded rules, with no ML, no baseline and no repeated runs</li>
+        <li class="k">An evaluator can only plan and paste logs</li>
+      </ul></div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="lbl"><span class="n mono">02</span><h2>Where we will be</h2><span class="sub mono">Live by<br>12 PM, 22 Nov</span></div>
+  <div>
+    <div class="pipe">
+      <div><span class="i mono">1</span><b>Sign in</b><small>Supabase Auth</small></div>
+      <div><span class="i mono">2</span><b>Upload APK</b><small>validated, private</small></div>
+      <div><span class="i mono">3</span><b>Pick profile</b><small>persona risk planner</small></div>
+      <div><span class="i mono">4</span><b>Emulator run</b><small>constraints + exploration</small></div>
+      <div><span class="i mono">5</span><b>ML analysis</b><small>vs baseline run</small></div>
+      <div><span class="i mono">6</span><b>Report</b><small>English and Indian languages</small></div>
+    </div>
+    <div class="spec">
+      <div><h3>Real constraints on the emulator</h3>
+        <ul>
+          <li><span class="k">Low-end device:</span> 2 GB RAM, Android 11 (ARM translation, so real APKs install), 720p screen, low free storage</li>
+          <li><span class="k">Indian network profiles:</span> rural 2G, crowded-station 3G, congested 4G, calibrated to TRAI MySpeed data</li>
+          <li><span class="k">Flaky network:</span> a metro-tunnel drop and recovery mid-session. <span class="k">Battery saver:</span> on</li>
+        </ul></div>
+      <div><h3>What we measure</h3>
+        <ul>
+          <li>Cold-start time, and UI jank (slow frames from <code>gfxinfo</code>)</li>
+          <li>Crashes, ANRs, network errors and timeouts</li>
+          <li>Offline handling: crash, freeze or error, plus recovery time</li>
+          <li>Memory, and mobile data used per session</li>
+        </ul></div>
+      <div><h3>Report</h3>
+        <ul>
+          <li>Bharat Readiness Score, with every point linked to its evidence</li>
+          <li>Pass, warn or fail per profile against baseline, with logcat evidence and a fix</li>
+          <li>Shareable link, PDF and JSON export</li>
+        </ul></div>
+      <div class="ml span2"><h3>ML and exploration in the core flow<span class="mono">scikit-learn, adb</span></h3>
+        <ul>
+          <li><span class="k">Failure classifier:</span> TF-IDF + linear model trained on LogHub Android logs and our runs. It labels crash, ANR, out-of-memory, network or storage, with a confidence score</li>
+          <li><span class="k">Anomaly detection:</span> statistical tests and IsolationForest on baseline vs constrained runs flag real regressions, not noise</li>
+          <li><span class="k">Exploration:</span> automated taps through the app with <code>adb monkey</code> find failures beyond the launch screen</li>
+        </ul></div>
+      <div><h3>Backend and reliability</h3>
+        <ul>
+          <li>Supabase Postgres with row-level security, private APK storage, no faked steps</li>
+          <li>Sample APK for evaluators. A fast default run (baseline + 1 profile), with the full suite optional</li>
+          <li>Clear errors and rate limits. Live on Vercel</li>
+        </ul></div>
+    </div>
+    <p class="stretch"><b>Stretch goals, only if time allows (not promised):</b> Hindi voice Q&amp;A about a report using Sarvam speech-to-text, a CI webhook, and a Neo4j failure-similarity graph</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="lbl"><span class="n mono">03</span><h2>User segments</h2><span class="sub mono">Primary + 2 more</span></div>
+  <table>
+    <tr><th style="width:26%">Segment</th><th style="width:26%">Their version of the problem</th><th style="width:30%">Use cases</th><th>Status by 12 PM</th></tr>
+    <tr><td><b style="font-weight:500">Primary:</b> small Indian app teams, startup developers and QA, with no device lab</td><td>Can't afford dozens of cheap phones, and users uninstall apps that fail on 2G/3G and 2 GB phones</td><td>1. Test an APK on cheap-phone profiles before release<br>2. Find crashes and slow starts, with evidence and fixes</td><td class="status"><span class="sig s4"><i></i><i></i><i></i><i></i></span>Working</td></tr>
+    <tr><td>Founders and PMs who aren't technical, or aren't comfortable in English</td><td>Can't read logs, and need a clear ship or no-ship decision</td><td>1. Read the verdict and fixes in Hindi, Tamil or Marathi<br>2. Listen to a voice summary of the report</td><td class="status"><span class="sig s4"><i></i><i></i><i></i><i></i></span>Working<small>New in the finale, built on Sarvam AI</small></td></tr>
+    <tr><td>App agencies, and vendors of government and Digital India apps</td><td>Must prove an app works for every citizen, on every release</td><td>1. Compare v1 and v2 on the same profile<br>2. Trigger runs automatically from CI</td><td class="status"><span class="sig s2"><i></i><i></i><i></i><i></i></span>Partial<small>Comparison working, CI API planned</small></td></tr>
+  </table>
+</section>
+
+<section class="sec">
+  <div class="lbl"><span class="n mono">04</span><h2>Partner tech: Sarvam AI</h2><span class="sub mono">Deepened into<br>every report</span></div>
+  <div>
+    <p class="t2" style="margin-bottom:8px"><span class="k">Product need:</span> Bharat's users, and many of the people who decide whether to ship, are not English-first. A test report only helps if the decision-maker understands it. Every report runs through Sarvam in the core flow, visible in the demo.</p>
+    <div class="cols3">
+      <div><h3>Sarvam LLM</h3><p class="t2">Turns the ML-classified failures into a plain-language explanation and a fix</p></div>
+      <div><h3>Sarvam Translate</h3><p class="t2">Renders the full report in Hindi, Tamil, Marathi and more</p></div>
+      <div><h3>Sarvam text-to-speech</h3><p class="t2">Reads the verdict aloud, for users who prefer voice</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="lbl"><span class="n mono">05</span><h2>Definition of done</h2></div>
+  <p class="dod"><b>An evaluator can sign in on our live URL, upload an APK, run it on a cheap-phone profile on a real constrained emulator, and get a genuine, ML-classified report against a baseline run, without our help.</b> The report covers crashes, launch time, network failures and a voice summary, in English or an Indian language.</p>
+</section>
+
+<footer class="foot">
+  <div><b>Security:</b> ArgosX baseline scan by midnight on 21 Nov, fixes, final scan by 11 AM on 22 Nov, with a remediation log</div>
+  <div><b>Market:</b> 3 live interviews with Indian Android developers and founders</div>
+</footer>
+
+</div></body></html>
