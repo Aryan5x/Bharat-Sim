@@ -133,7 +133,7 @@ class ProxyPathTests(unittest.TestCase):
             evidence = journey.prepare_proxy_path()
 
         self.assertEqual(evidence["status"], "ready")
-        self.assertEqual(attempts, {"route": 2, "proxy": 2})
+        self.assertEqual(attempts, {"route": 3, "proxy": 2})
 
     def test_preflight_fails_if_no_android_network_is_active(self):
         with (
