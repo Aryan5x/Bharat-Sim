@@ -1,7 +1,7 @@
 # BharatSim — final product audit
 
 **Audit date:** 2026-11-21  
-**Audited ref:** `main` at `4a1381db9d21e05a5f351bdac5d5710377839c1c`  
+**Audited ref:** `main` at `5ab14c89b6159c07ba538c1c5c5ddbc44ba8a49c`  
 **Working branch:** `product/final-completion-audit-2026-11`  
 **Decision:** controlled-beta MVP; **not approved for production arbitrary-APK execution**.
 
@@ -21,10 +21,10 @@ The key issue is not absence of all engineering. It is the gap between a careful
 | Main SHA | `4a1381db9d21e05a5f351bdac5d5710377839c1c` (2026-11-21) | Verified |
 | Branch inventory | Numerous feature/fix/docs branches exist; branch names and heads were inspected. A branch existing is not proof it is merged or current. | Reviewed |
 | PR inventory | PRs through #130 inspected; #130 merged 2026-11-03. Latest relevant integration PRs #126/#127 merged 2026-11-02. | Reviewed |
-| CI on audited main | Run #44906460960 completed 2026-11-21: backend, frontend build, PostgreSQL integration, worker guards, container build and unified build passed; Playwright E2E failed (10 failures, 2 passes) waiting for the API-connected UI state. | Mixed; E2E blocker |
+| CI on audited main | Run #44906616552 completed 2026-11-21: backend, frontend build, PostgreSQL integration, worker guards, container build and unified build passed; Playwright E2E failed (10 failures, 2 passes) waiting for the API-connected UI state. | Mixed; E2E blocker |
 | Dependency audit | Run #44906460952 completed successfully 2026-11-21; Python and JavaScript dependency jobs succeeded. | Verified on audited main |
-| Android emulator CI | Latest main smoke run #44906460995 was cancelled; earlier fixture smoke #42507735274 passed 2026-11-08. | Earlier fixture only; current run unverified |
-| Main deployment status | Vercel status for audited SHA `4a1381d` reports deployment completed successfully. This proves provider deployment status, not live application health or full product readiness. | Deployment reported successful |
+| Android emulator CI | Latest main emulator smoke #44906616568 passed 2026-11-21 on a fixture APK with Appium/UiAutomator2 and a verified network-shaping path in CI. | Earlier fixture only; current run unverified |
+| Main deployment status | Vercel status for audited SHA `5ab14c8` reports deployment completed successfully. This proves provider deployment status, not live application health or full product readiness. | Deployment reported successful |
 | Current live HTTP | Direct live HTTP inspection was not available in this audit environment. Do not infer live health from GitHub CI or deployment metadata. | Unverified |
 
 ## Feature audit
@@ -68,7 +68,7 @@ Legend: **Working (bounded)** means code and automated evidence support the stat
 | Performance | Partial | Vite production build and test infrastructure exist. No current Lighthouse/Web Vitals, bundle budget, mobile performance or large-log virtualization evidence was found. |
 | E2E testing | Blocked by current regression | Playwright dashboard E2E exists. On audited main SHA, 10 tests failed and 2 passed because assertions timed out waiting for the API-connected UI state; exact root cause is not yet isolated. Earlier CI passed on 2026-11-08. |
 | Security tests | Working (bounded) | Backend security, upload, worker protocol, auth and dependency audit suites exist. A passing dependency audit is not a penetration test or production security certification. |
-| Production deployment | Provider reports success; runtime unverified | Vercel reports a completed deployment for audited SHA `4a1381d`. The public site was not independently fetched and production database/storage/worker readiness remains unverified. |
+| Production deployment | Provider reports success; runtime unverified | Vercel reports a completed deployment for audited SHA `5ab14c8`. The public site was not independently fetched and production database/storage/worker readiness remains unverified. |
 
 ## Frontend route and interaction inventory
 
@@ -159,7 +159,7 @@ Design work required:
 
 ## Latest upstream additions and critical gaps
 
-The audited main commit `4a1381d` added a portable classifier, statistical comparison, evaluator scenario fixtures, Bulbul TTS endpoint/player, run-comparison UI and additional Android telemetry. These features are real code additions, but the following gaps were found during review:
+The audited main commit `5ab14c8` added a portable classifier, statistical comparison, evaluator scenario fixtures, Bulbul TTS endpoint/player, run-comparison UI and additional Android telemetry. These features are real code additions, but the following gaps were found during review:
 
 - `/api/v1/runs/compare` selected a non-existent `report_json` column (the schema uses `result_json`), did not scope both rows to the authenticated owner, substituted hardcoded telemetry values when measurements were absent, and returned a nested response that did not match the frontend contract.
 - The evaluator scenarios API returns `items`, while the frontend client expected `scenarios`; the banner was imported but not mounted in the overview.
