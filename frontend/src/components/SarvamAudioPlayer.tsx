@@ -26,13 +26,14 @@ export default function SarvamAudioPlayer({
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
       audioRef.current?.pause();
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
     };
-  }, [audioUrl]);
+  }, []);
 
   const handlePlay = async () => {
     if (playing && audioRef.current) {
@@ -72,6 +73,7 @@ export default function SarvamAudioPlayer({
       }
       const blob = new Blob([bytes], { type: response.format || "audio/wav" });
       const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => setPlaying(false);
@@ -92,6 +94,8 @@ export default function SarvamAudioPlayer({
   const handleLanguageChange = (newLanguage: string) => {
     audioRef.current?.pause();
     audioRef.current = null;
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = null;
     setAudioUrl(null);
     setPlaying(false);
     setError(null);
