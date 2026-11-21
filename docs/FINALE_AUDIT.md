@@ -50,6 +50,23 @@ re-checked against source, tests or the live deployment.
 | Microphone permission | BLOCKED | FIXED | `microphone=(self)` live |
 | Other Janjeevan packs (B–F) | n/a | NOT BUILT | Listed as planned, with the missing piece |
 
+### Live end-to-end evidence (21 Nov 2026, 23:10 IST, bharatsim.onrender.com, signed-in user)
+- Plan created in Speak-to-Test from the Hinglish request (Sarvam `sarvam-105b`), matched `upi-pending-retry`.
+- Run `da29da4a` (bharatpay-original.apk, SHA-256 `93d8a5db8c1c…`), completed on the emulator:
+  - Scenario verdict **fail**: 2 charges for one order.
+  - Screen after timeout: "Payment failed. Please retry."
+  - Readiness 89.
+- Run `e0174831` (bharatpay-fixed.apk, `e400222ba5eb…`), completed:
+  - Scenario verdict **pass**: 1 charge.
+  - Screen: "Payment pending: waiting for bank confirmation. Do not pay again."
+  - Readiness 90.
+- FixProof (`da29da4a` → `e0174831`): **FIXED AND VERIFIED**. All 6 preconditions passed.
+- FixProof against crashed run `2d4f7e56`: **VERIFICATION BLOCKED**.
+- Citizen Impact explanation of `da29da4a` (public audience, Hindi): HTTP 200, 9 evidence ids cited, Sarvam request `20261121_283d6608-39c5-440f-a5c9-09b2d3d0048c`.
+- Earlier runs `625c18b3`, `336d9e23`, `f92c6d7e`, `2d4f7e56` failed and are kept as failed:
+  - The first two because the worker was pointed at a stale local API.
+  - The last two because the emulator crashed.
+
 Tests on merged code: backend 206 passed (2 skipped), worker 111 passed, frontend 55 passed, production build OK.
 
 ## Priorities chosen
