@@ -123,7 +123,7 @@ export default function ConnectLaptopView({ previewMode }: { previewMode: boolea
             <ul>
               <li>8 GB RAM (16 GB recommended) and about 6 GB free disk</li>
               <li>Hardware virtualization on (Intel VT-x / AMD-V; Windows Hypervisor Platform on Windows)</li>
-              <li>Python 3.10+ (the Windows installer can add it for you)</li>
+              <li>Internet for the first setup; the installer brings its own Python, so your installed Python does not matter</li>
             </ul>
           </div>
         </div>

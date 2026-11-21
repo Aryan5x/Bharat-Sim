@@ -31,10 +31,11 @@ case "$OS" in
   *) fail "Unsupported OS $OS (use the Windows installer on Windows)." ;;
 esac
 case "$ARCH" in
-  arm64|aarch64) JRE_ARCH=aarch64; IMAGE="system-images;android-30;google_apis;arm64-v8a" ;;
-  x86_64|amd64) JRE_ARCH=x64; IMAGE="system-images;android-30;google_apis;x86_64" ;;
+  arm64|aarch64) JRE_ARCH=aarch64; IMAGE="system-images;android-30;google_apis;arm64-v8a"; UV_ARCH=aarch64 ;;
+  x86_64|amd64) JRE_ARCH=x64; IMAGE="system-images;android-30;google_apis;x86_64"; UV_ARCH=x86_64 ;;
   *) fail "Unsupported CPU $ARCH." ;;
 esac
+if [[ "$OS" == "Darwin" ]]; then UV_TARGET="$UV_ARCH-apple-darwin"; else UV_TARGET="$UV_ARCH-unknown-linux-gnu"; fi
 
 cat <<EOF
 
@@ -56,14 +57,17 @@ if [[ "$OS" == "Linux" ]]; then
   fi
 fi
 
-step 2 "Finding Python 3.10+"
-PY=""
-for c in python3.12 python3.11 python3.10 python3; do
-  if command -v "$c" >/dev/null 2>&1 && "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)'; then PY="$c"; break; fi
-done
-[[ -n "$PY" ]] || fail "Install Python 3.10+ (macOS: brew install python@3.12; Ubuntu: sudo apt install python3 python3-venv) and run again."
-"$PY" -c 'import venv' 2>/dev/null || fail "Python venv module missing (Ubuntu: sudo apt install python3-venv)."
-echo "  using $PY"
+step 2 "Python 3.12 for the worker (private copy via uv; your own Python is not used or changed)"
+# scikit-learn 1.6.1 (needed by the worker's ML model) has prebuilt packages only for Python 3.9-3.13; a newer
+# system Python would try to compile it. uv (https://github.com/astral-sh/uv) fetches a private Python 3.12.
+UV="$HOME_DIR/uv/uv"
+if [[ ! -x "$UV" ]]; then
+  mkdir -p "$HOME_DIR/uv"
+  curl -fL "https://github.com/astral-sh/uv/releases/latest/download/uv-$UV_TARGET.tar.gz" -o "$HOME_DIR/uv.tar.gz"
+  tar -xzf "$HOME_DIR/uv.tar.gz" -C "$HOME_DIR/uv" --strip-components 1; rm "$HOME_DIR/uv.tar.gz"
+fi
+export UV_PYTHON_INSTALL_DIR="$HOME_DIR/python" UV_CACHE_DIR="$HOME_DIR/uv-cache"
+"$UV" python install 3.12 || fail "Could not download Python 3.12 (check your internet connection and run again)."
 
 step 3 "Java 17 runtime (needed by the Android SDK tools)"
 JAVA_BIN="$(find "$JDK" -type f -name java -path '*/bin/*' 2>/dev/null | head -1 || true)"
@@ -107,10 +111,12 @@ rm -rf "$HOME_DIR/src-tmp" "$APP"; mkdir -p "$HOME_DIR/src-tmp" "$APP"
 (cd "$HOME_DIR/src-tmp" && unzip -q "$HOME_DIR/bharatsim.zip"); rm "$HOME_DIR/bharatsim.zip"
 cp -R "$HOME_DIR"/src-tmp/*/worker "$APP/worker"; rm -rf "$HOME_DIR/src-tmp"
 
-step 9 "Python environment"
-"$PY" -m venv "$VENV"
-"$VENV/bin/python" -m pip install --quiet --upgrade pip
-"$VENV/bin/python" -m pip install --quiet "scikit-learn==1.6.1" "joblib==1.4.2"
+step 9 "Python environment (prebuilt packages only, nothing is compiled)"
+rm -rf "$VENV"  # a previous failed attempt may have left a broken venv
+"$UV" venv --python 3.12 "$VENV"
+"$UV" pip install --python "$VENV/bin/python" --only-binary ":all:" "scikit-learn==1.6.1" "joblib==1.4.2" \
+  || fail "Could not install the worker's Python packages."
+"$VENV/bin/python" -c "import sklearn, joblib; print('  scikit-learn', sklearn.__version__, 'ready')"
 
 step 10 "Writing configuration"
 umask 077

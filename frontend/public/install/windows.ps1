@@ -47,22 +47,23 @@ if ($cpu.VirtualizationFirmwareEnabled -eq $false) {
     Write-Host "  Virtualization looks disabled in BIOS/UEFI. The emulator needs it (Intel VT-x / AMD-V)." -ForegroundColor Yellow
 }
 
-Step 2 "Finding Python 3.10+"
-$Python = $null
-foreach ($cand in @("py -3.12", "py -3.11", "py -3.10", "python")) {
-    $parts = $cand.Split(" ")
-    try {
-        $v = & $parts[0] $parts[1..9] -c "import sys; print('%d.%d' % sys.version_info[:2])" 2>$null
-        if ($v -and [version]$v -ge [version]"3.10") { $Python = $parts; break }
-    } catch {}
+Step 2 "Python 3.12 for the worker (private copy via uv; your own Python is not used or changed)"
+# The worker's ML model needs scikit-learn 1.6.1, which has prebuilt packages only for Python 3.9-3.13.
+# A laptop's default Python may be newer (e.g. 3.14) and would try to compile it from source, so the
+# installer uses uv (https://github.com/astral-sh/uv) to fetch a private Python 3.12 into $Home_.
+$Uv = Join-Path $Home_ "uv\uv.exe"
+if (-not (Test-Path $Uv)) {
+    $zip = Join-Path $Home_ "uv.zip"
+    Invoke-WebRequest "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip" -OutFile $zip
+    Expand-Archive $zip -DestinationPath (Join-Path $Home_ "uv") -Force; Remove-Item $zip
+    $found = Get-ChildItem (Join-Path $Home_ "uv") -Filter uv.exe -Recurse | Select-Object -First 1
+    if ($found.FullName -ne $Uv) { Move-Item $found.FullName $Uv -Force }
 }
-if (-not $Python) {
-    $ok = Read-Host "Python 3.10+ was not found. Install Python 3.12 with winget now? (Y/N)"
-    if ($ok -notin @("Y", "y")) { Fail "Install Python 3.10+ from python.org, then run this again." }
-    winget install -e --id Python.Python.3.12 --accept-source-agreements --scope user
-    $Python = @("py", "-3.12")
-}
-Write-Host "  using $($Python -join ' ')"
+$env:UV_PYTHON_INSTALL_DIR = Join-Path $Home_ "python"
+$env:UV_CACHE_DIR = Join-Path $Home_ "uv-cache"
+& $Uv python install 3.12
+if ($LASTEXITCODE -ne 0) { Fail "Could not download Python 3.12 (check your internet connection and run again)." }
+Write-Host "  Python 3.12 ready"
 
 Step 3 "Java 17 runtime (needed by the Android SDK tools)"
 $Java = Get-ChildItem -Path $Jdk -Filter java.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -120,12 +121,14 @@ New-Item -ItemType Directory -Force $App | Out-Null
 Copy-Item (Join-Path $src.FullName "worker") (Join-Path $App "worker") -Recurse
 Remove-Item $tmp -Recurse -Force
 
-Step 9 "Python environment"
-& $Python[0] $Python[1..9] -m venv $Venv
+Step 9 "Python environment (prebuilt packages only, nothing is compiled)"
+if (Test-Path $Venv) { Remove-Item $Venv -Recurse -Force }  # a previous failed attempt may have left a broken venv
+& $Uv venv --python 3.12 $Venv
+if ($LASTEXITCODE -ne 0) { Fail "Could not create the Python 3.12 environment." }
 $VenvPy = Join-Path $Venv "Scripts\python.exe"
-& $VenvPy -m pip install --quiet --upgrade pip
-& $VenvPy -m pip install --quiet "scikit-learn==1.6.1" "joblib==1.4.2"
-if ($LASTEXITCODE -ne 0) { Fail "pip could not install the worker's packages." }
+& $Uv pip install --python $VenvPy --only-binary ":all:" "scikit-learn==1.6.1" "joblib==1.4.2"
+if ($LASTEXITCODE -ne 0) { Fail "Could not install the worker's Python packages." }
+& $VenvPy -c "import sklearn, joblib; print('  scikit-learn', sklearn.__version__, 'ready')"
 
 Step 10 "Writing configuration"
 @"
