@@ -1,5 +1,5 @@
 import pytest
-from backend.app.anomaly_detector import detect_regressions, _calculate_statistical_anomaly_score
+from app.anomaly_detector import detect_regressions
 
 
 def test_detect_regressions_handles_empty_inputs_gracefully():

@@ -35,19 +35,19 @@ export default function LandingPage({
   const faqs = [
     {
       q: "How does BharatSim simulate real Indian network conditions?",
-      a: "BharatSim configures QEMU emulator console network latency and bandwidth shaping alongside host-side HTTP CONNECT proxy throttles (e.g. 450ms RTT, 256kbps bandwidth, and 8% packet drops for Edge Village; 250ms RTT for Crowded Station). Every condition is verified through control-plane readback."
+      a: "CI exercises a bounded fixture proxy path that can set and read back selected latency/bandwidth controls. Production network shaping is currently disabled; packet loss, outage/recovery and CPU constraints are unsupported, and arbitrary APK traffic fidelity is not verified."
     },
     {
       q: "What is the Bharat Readiness Score?",
-      a: "The Bharat Readiness Score (0–100) is a transparent, evidence-derived heuristic evaluated from captured crash dumps, ANR traces, jank frame percentages (dumpsys gfxinfo), and peak PSS memory usage (dumpsys meminfo) under constrained hardware profiles."
+      a: "The Bharat Readiness Score is a transparent heuristic based only on signals actually present in submitted logcat or worker evidence. Missing telemetry is not imputed; it is not a certification or a prediction of real-world user impact."
     },
     {
       q: "How does the Machine Learning failure classifier work?",
-      a: "BharatSim uses a portable zero-DLL TF-IDF centroid vector classifier trained on authentic Android logcat failure signatures. It categorizes crashes, ANRs, OOMs, and network timeouts in sub-millisecond time with 100% precision on holdout traces."
+      a: "BharatSim uses a portable TF-IDF class-centroid classifier trained on a small curated set of Android logcat examples. The reported 100% figure is training-set resubstitution, not independent holdout accuracy. Treat the category as a triage hint and verify the linked source evidence."
     },
     {
       q: "How is Sarvam AI integrated into the testing workflow?",
-      a: "Sarvam AI translates diagnostic reports into regional Indian languages (Hindi, Tamil, Marathi) and generates audio diagnostic briefings via the Bulbul TTS speech synthesis engine (`bulbul:v1`), alongside automated defensive code remedies."
+      a: "Sarvam translation and Bulbul TTS are provider-backed features that require a server-side SARVAM_API_KEY. Remediation text currently comes from deterministic rule-based templates; BharatSim does not claim a generative Sarvam root-cause diagnosis."
     }
   ];
 
@@ -68,8 +68,7 @@ export default function LandingPage({
         </h1>
 
         <p className="landing-hero-subtitle">
-          Find crashes, slowdowns, and connectivity failures before your users do.
-          Simulate 2GB RAM budget hardware, rural 2G/3G connectivity, and peak urban cell tower congestion with genuine Android ADB automation.
+          Inspect Android logs and, when an isolated worker is configured, exercise APKs against supported device and network profiles. Review evidence from actual runs rather than synthetic dashboard metrics.
         </p>
 
         <div className="landing-cta-group">
@@ -148,9 +147,9 @@ export default function LandingPage({
       <section className="landing-preview-section">
         <div className="section-header-center">
           <span className="section-eyebrow">ENGINEERING OBSERVABILITY</span>
-          <h2>Deterministic Telemetry & Real-World Constraints</h2>
+          <h2>Evidence-led Android Diagnostics</h2>
           <p>
-            BharatSim bridges the gap between synthetic emulator benchmarks and chaotic Indian edge conditions.
+            Inspect submitted Android logs and review worker evidence when a properly isolated execution environment is configured.
           </p>
         </div>
 
@@ -167,7 +166,7 @@ export default function LandingPage({
             </div>
             <div className="preview-status-pill">
               <span className="pulse-green" />
-              <span>LIVE PIPELINE</span>
+              <span>INTERACTIVE PRODUCT PREVIEW · NO APK EXECUTION</span>
             </div>
           </div>
 
@@ -193,64 +192,62 @@ export default function LandingPage({
 
               <div className="constraint-readout-box">
                 <div className="readout-row">
-                  <span>RAM Ceiling:</span>
+                  <span>Target RAM profile:</span>
                   <strong>{selectedPersona.ram_mb} MB (2GB class)</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Network Latency:</span>
-                  <strong className="text-warning">+{selectedPersona.latency_ms} ms injected</strong>
+                  <span>Target network latency:</span>
+                  <strong className="text-warning">+{selectedPersona.latency_ms} ms (applied only on a configured worker)</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Throughput Cap:</span>
+                  <span>Target throughput:</span>
                   <strong>{selectedPersona.down_kbps} kbps down / {selectedPersona.up_kbps} kbps up</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Packet Drop:</span>
-                  <strong className={selectedPersona.packet_loss_pct > 0 ? "text-danger" : ""}>
-                    {selectedPersona.packet_loss_pct}% loss
-                  </strong>
+                  <span>Packet loss:</span>
+                  <strong className="text-muted">Not applied by the current worker</strong>
                 </div>
                 <div className="readout-row">
-                  <span>Battery Saver:</span>
-                  <strong>{selectedPersona.battery_saver ? "Enabled (CPU Throttled)" : "Disabled"}</strong>
+                  <span>Battery-saver target:</span>
+                  <strong>{selectedPersona.battery_saver ? "Requested; CPU throttling not verified" : "Not requested"}</strong>
                 </div>
               </div>
             </div>
 
             <div className="preview-pane-right">
-              <h4>Real-Time Subsystem Telemetry</h4>
+              <h4>Telemetry available after a real worker run</h4>
               <div className="telemetry-display-grid">
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Gauge size={13} /> Jank Frames (gfxinfo)</span>
-                  <strong className="stat-value text-warning">28.4%</strong>
-                  <span className="stat-sub">&gt; 16.6ms UI frame deadline</span>
+                  <strong className="stat-value text-muted">—</strong>
+                  <span className="stat-sub">Available when gfxinfo is captured</span>
                 </div>
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Cpu size={13} /> Peak PSS Memory</span>
-                  <strong className="stat-value text-danger">342 MB</strong>
-                  <span className="stat-sub">High LMKD kill vulnerability</span>
+                  <strong className="stat-value text-muted">—</strong>
+                  <span className="stat-sub">Available when meminfo is captured</span>
                 </div>
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Brain size={13} /> ML Classification</span>
-                  <strong className="stat-value text-accent">NETWORK_TIMEOUT</strong>
-                  <span className="stat-sub">98.2% softmax confidence</span>
+                  <strong className="stat-value text-muted">—</strong>
+                  <span className="stat-sub">Classifier output appears after log analysis</span>
                 </div>
                 <div className="telemetry-stat-card">
                   <span className="stat-label"><Sparkles size={13} /> Sarvam AI Translation</span>
-                  <strong className="stat-value text-success">Hindi / Tamil / Marathi</strong>
-                  <span className="stat-sub">Bulbul TTS audio briefing</span>
+                  <strong className="stat-value text-muted">Provider gated</strong>
+                  <span className="stat-sub">Requires SARVAM_API_KEY</span>
                 </div>
               </div>
 
               <div className="terminal-log-snippet">
                 <div className="terminal-header">
-                  <span>AUTHENTIC LOGCAT TRACE EXCERPT</span>
+                  <span>ILLUSTRATIVE LOGCAT EXCERPT · SAMPLE ONLY</span>
                   <span className="log-badge">L142-L147</span>
                 </div>
                 <code>
-                  [W/System.err] java.net.SocketTimeoutException: failed to connect to api.bharatpay.in/103.21.244.0 (port 443) after 15000ms<br />
-                  [E/PaymentFlow] Checkout timeout after 450ms network jitter on rural edge cell<br />
-                  [I/BharatSim] ML Centroid match: 'network' (confidence: 0.984)
+                  [W/System.err] java.net.SocketTimeoutException: failed to connect to api.example.test (port 443) after 15000ms<br />
+                  [E/ExampleFlow] Request timed out while waiting for a network response<br />
+                  [I/BharatSim] A classifier result is shown only after submitted evidence is analysed
                 </code>
               </div>
             </div>
@@ -261,59 +258,59 @@ export default function LandingPage({
       {/* Feature Capabilities Grid */}
       <section className="landing-features-section">
         <div className="section-header-center">
-          <span className="section-eyebrow">COMPREHENSIVE PLATFORM CAPABILITIES</span>
+          <span className="section-eyebrow">IMPLEMENTED WORKFLOWS & DOCUMENTED LIMITS</span>
           <h2>Built for the Reality of Bharat's Device Diversity</h2>
           <p>
-            Everything engineering teams need to validate reliability before launching to millions of Indian users.
+            A practical set of evidence-linked Android diagnostics, planning tools and guarded execution workflows.
           </p>
         </div>
 
         <div className="features-grid">
           <div className="feature-card">
             <div className="feature-icon icon-blue"><Smartphone size={20} /></div>
-            <h3>4 Pre-Configured Bharat Personas</h3>
+            <h3>Curated Bharat Test Personas</h3>
             <p>
-              Test against Budget Android (2GB RAM, Android 11), Edge Village (450ms high latency), Crowded Station (congested 3G), and Congested Urban 4G.
+              Use authored target profiles to plan tests. Profile values are requested conditions, not measurements from physical devices.
             </p>
           </div>
 
           <div className="feature-card">
             <div className="feature-icon icon-emerald"><Brain size={20} /></div>
-            <h3>Zero-DLL ML Failure Classifier</h3>
+            <h3>Evidence-linked Log Triage</h3>
             <p>
-              Trained on 58 authentic Android logcat failure signatures. Instant attribution of crashes, ANRs, OOMs, and network drops in under 1ms.
+              A portable TF-IDF class-centroid model and deterministic rules classify common log markers. Results are triage hints, not verified root causes or independently benchmarked accuracy.
             </p>
           </div>
 
           <div className="feature-card">
             <div className="feature-icon icon-amber"><Wifi size={20} /></div>
-            <h3>Verified Network Shaping</h3>
+            <h3>Scoped Emulator Network Controls</h3>
             <p>
-              Injected latency, bandwidth constraints, and packet drop simulation via QEMU emulator console and host-side HTTP CONNECT proxy.
+              Selected emulator latency and bandwidth controls can be applied and read back by a configured worker. Packet loss and outage recovery are unsupported; fixture proxy evidence does not prove arbitrary APK traffic fidelity.
             </p>
           </div>
 
           <div className="feature-card">
             <div className="feature-icon icon-purple"><Sparkles size={20} /></div>
-            <h3>Sarvam AI Indic & Bulbul TTS</h3>
+            <h3>Provider-gated Indic Services</h3>
             <p>
-              Multilingual report generation in Hindi, Tamil, and Marathi with embedded voice briefing audio playback and automated defensive code remedies.
+              Report translation and Bulbul text-to-speech require a server-side SARVAM_API_KEY. Remediation suggestions are deterministic templates, not generative root-cause diagnoses.
             </p>
           </div>
 
           <div className="feature-card">
             <div className="feature-icon icon-cyan"><Activity size={20} /></div>
-            <h3>Multivariate Anomaly Detection</h3>
+            <h3>Evidence-based Run Comparison</h3>
             <p>
-              Automatic statistical covariance comparison between baseline control runs and constrained executions across cold-start, jank, RAM, and network.
+              Compare persisted metrics shared by two completed worker reports. Missing measurements are excluded rather than estimated or filled with sample values.
             </p>
           </div>
 
           <div className="feature-card">
             <div className="feature-icon icon-rose"><ShieldCheck size={20} /></div>
-            <h3>ArgosX Security Hardened</h3>
+            <h3>Guarded Execution & Private Data</h3>
             <p>
-              Clean security posture with strict CORS headers, nosniff, frame protection, ZIP magic byte signature validation, and database Row-Level Security.
+              The API includes authentication, owner-scoped data access and private-storage controls. Public APK execution remains disabled until an isolated worker host and default-deny egress are independently verified.
             </p>
           </div>
         </div>
@@ -323,7 +320,7 @@ export default function LandingPage({
       <section className="landing-workflow-section">
         <div className="section-header-center">
           <span className="section-eyebrow">HOW IT WORKS</span>
-          <h2>From Upload to Bharat Readiness Report in 3 Steps</h2>
+          <h2>From APK Intake to Evidence Review</h2>
         </div>
 
         <div className="workflow-steps-grid">
@@ -336,13 +333,13 @@ export default function LandingPage({
           <div className="workflow-step-card">
             <span className="step-num">02</span>
             <h4>Select Target Persona & Explore</h4>
-            <p>Choose an Indian device and network profile. The worker executes bounded monkey exploration while capturing gfxinfo and meminfo.</p>
+            <p>Choose an authored persona. If an approved isolated worker is online, it can execute the configured workflow and collect the telemetry it supports.</p>
           </div>
 
           <div className="workflow-step-card">
             <span className="step-num">03</span>
-            <h4>Inspect Findings & Listen to Audio</h4>
-            <p>Review failure attributions, compare baseline regressions, and listen to Sarvam AI voice briefings in regional Indian languages.</p>
+            <h4>Inspect Findings & Export Evidence</h4>
+            <p>When configured, use provider-backed report translation and Bulbul voice briefings. Without the server key, these controls remain unavailable rather than playing sample audio.</p>
           </div>
         </div>
       </section>
@@ -359,6 +356,15 @@ export default function LandingPage({
             <div
               key={index}
               className={"faq-item " + (activeFaq === index ? "open" : "")}
+              role="button"
+              tabIndex={0}
+              aria-expanded={activeFaq === index}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setActiveFaq(activeFaq === index ? null : index);
+                }
+              }}
               onClick={() => setActiveFaq(activeFaq === index ? null : index)}
             >
               <div className="faq-question">

@@ -28,3 +28,7 @@ smoke-android/build/
 # Playwright-generated output is local test state, never source evidence.
 frontend/playwright-report/
 frontend/test-results/
+
+# worker runtime and local builds
+worker/.cache/
+fixtures/out/

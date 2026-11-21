@@ -2,6 +2,7 @@ export type SignedApkUploadTicket = {
   run_id: string;
   upload_token: string;
   tus_endpoint: string;
+  signed_upload_url?: string;
   object_path: string;
   expires_in_seconds: number;
 };
@@ -269,4 +270,39 @@ export async function uploadApkResumable(
   }
 
   onProgress(100);
+}
+
+
+/**
+ * Upload the APK with one signed PUT to private Storage, reporting progress.
+ * The signed URL is issued by our API for a server-generated object path and is
+ * only accepted when it points at this project's Supabase Storage.
+ */
+export function uploadApkSigned(file: File, ticket: SignedApkUploadTicket, onProgress: (percentage: number) => void): Promise<void> {
+  const url = ticket.signed_upload_url;
+  if (!url || !isTrustedStorageUrl(url, "/storage/v1/object/upload/sign/")) {
+    return Promise.reject(new Error("The server returned an untrusted upload URL."));
+  }
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", "application/vnd.android.package-archive");
+    xhr.timeout = 10 * 60 * 1000;
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100);
+        resolve();
+      } else if (xhr.status === 413) {
+        reject(new Error("The APK is larger than the 50 MB storage limit."));
+      } else {
+        reject(new Error("Private upload failed (" + xhr.status + "). Please try again."));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error while uploading the APK. Check your connection and retry."));
+    xhr.ontimeout = () => reject(new Error("The upload timed out. Check your connection and retry."));
+    xhr.send(file);
+  });
 }

@@ -72,7 +72,7 @@ export default function DashboardOverview({
             <span className="mini-bars">
               <i /><i /><i /><i />
             </span>
-            <span>4 India edge + 2 controls</span>
+            <span>{apiStatus === "online" ? "Profiles returned by API" : "Built-in profile definitions"}</span>
           </div>
         </div>
 
@@ -86,7 +86,7 @@ export default function DashboardOverview({
           </div>
           <div className="metric-foot">
             <span className="metric-neutral" />
-            <span>{previewMode ? "Sign in for private history" : runs.filter(r => r.status === "completed").length + " smoke completed"}</span>
+            <span>{previewMode ? "Sign in for private history" : runs.filter(r => r.status === "completed").length + " completed runs"}</span>
           </div>
         </div>
 
@@ -100,7 +100,7 @@ export default function DashboardOverview({
           </div>
           <div className="metric-foot">
             <span className={"pulse-dot " + (activeWorkersCount > 0 ? "worker-online" : "")} />
-            <span>{activeWorkersCount > 0 ? "Heartbeats active" : "Waiting for worker"}</span>
+            <span>{apiStatus === "offline" ? "Status unavailable" : activeWorkersCount > 0 ? "Heartbeats active" : "Waiting for worker"}</span>
           </div>
         </div>
 
@@ -109,12 +109,12 @@ export default function DashboardOverview({
             BHARATSCORE <Gauge size={16} />
           </div>
           <div className="metric-value">
-            {analysis ? analysis.bharat_score.value : "85"}
-            <span className="metric-unit"> / 100</span>
+            {analysis ? analysis.bharat_score.value : "—"}
+            <span className="metric-unit">{analysis ? " / 100" : " no report"}</span>
           </div>
           <div className="metric-foot">
             <span className="score-dot" />
-            <span>{analysis ? analysis.bharat_score.label : "Readiness benchmark"}</span>
+            <span>{analysis ? analysis.bharat_score.label : "Calculated from submitted evidence"}</span>
           </div>
         </div>
       </section>
@@ -240,11 +240,31 @@ export default function DashboardOverview({
             </div>
             <div className="status-grid-item">
               <small>ML Classifier</small>
-              <b className="text-success">Centroid Vector v2 (Active)</b>
+              <b className={capabilities?.ml_classifier === true ? "text-success" : "text-danger"}>
+                {capabilities?.ml_classifier === true
+                  ? "TF-IDF centroid classifier available"
+                  : capabilities?.ml_classifier === false
+                  ? "Classifier unavailable"
+                  : "Capability status unknown"}
+              </b>
             </div>
             <div className="status-grid-item">
               <small>Sarvam AI Bulbul</small>
-              <b className="text-success">TTS & Translation Enabled</b>
+              <b className={
+                capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true
+                  ? "text-success"
+                  : "text-danger"
+              }>
+                {capabilities?.sarvam_translation === true && capabilities?.sarvam_audio_tts === true
+                  ? "Translation & voice configured"
+                  : capabilities?.sarvam_translation === true
+                  ? "Translation only · voice unavailable"
+                  : capabilities?.sarvam_audio_tts === true
+                  ? "Voice only · translation unavailable"
+                  : capabilities
+                  ? "Provider not configured"
+                  : "Capability status unknown"}
+              </b>
             </div>
           </div>
 
@@ -252,7 +272,7 @@ export default function DashboardOverview({
             <ShieldCheck size={16} />
             <span>
               {capabilities?.notes?.[0] ||
-                "Tenant isolation and PostgreSQL Row-Level Security active across all private APK runs."}
+                "Live capability details are unavailable. Database readiness, tenant isolation and worker execution have not been verified."}
             </span>
           </div>
         </section>

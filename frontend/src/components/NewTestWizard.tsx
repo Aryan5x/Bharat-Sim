@@ -8,6 +8,7 @@ import {
   X
 } from "lucide-react";
 import { type Persona } from "../api";
+import CustomPersonaBuilder, { DEFAULT_CUSTOM_PERSONA, type CustomPersona } from "./CustomPersonaBuilder";
 
 interface NewTestWizardProps {
   personas: Persona[];
@@ -15,9 +16,12 @@ interface NewTestWizardProps {
   onSelectPersona: (id: string) => void;
   busy: boolean;
   uploadAvailable: boolean;
+  maxUploadMb?: number;
   lockedReason?: string;
   onSubmit: (apkFile: File) => Promise<void>;
   onCancel: () => void;
+  customPersona?: CustomPersona;
+  onCustomPersonaChange?: (p: CustomPersona) => void;
 }
 
 export default function NewTestWizard({
@@ -26,18 +30,22 @@ export default function NewTestWizard({
   onSelectPersona,
   busy,
   uploadAvailable,
+  maxUploadMb = 150,
   lockedReason,
   onSubmit,
-  onCancel
+  onCancel,
+  customPersona = DEFAULT_CUSTOM_PERSONA,
+  onCustomPersonaChange = () => undefined
 }: NewTestWizardProps) {
   const [apkFile, setApkFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [fileSha, setFileSha] = useState<string | null>(null);
   const [calculatingHash, setCalculatingHash] = useState(false);
-  const [interactionCount, setInteractionCount] = useState(100);
-  const [enableGfxinfo, setEnableGfxinfo] = useState(true);
-  const [enableMeminfo, setEnableMeminfo] = useState(true);
+  // Current worker API applies fixed defaults; these are shown read-only until per-run overrides are supported.
+  const interactionCount = 100;
+  const enableGfxinfo = true;
+  const enableMeminfo = true;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activePersonaObj = personas.find((p) => p.id === selectedPersona) || personas[0];
@@ -45,14 +53,20 @@ export default function NewTestWizard({
   const validateAndSetFile = async (file: File) => {
     setValidationError(null);
     setFileSha(null);
+    setApkFile(null);
+
+    if (!uploadAvailable) {
+      setValidationError(lockedReason || "APK registration is unavailable on this deployment.");
+      return;
+    }
 
     if (!file.name.toLowerCase().endsWith(".apk")) {
       setValidationError("File must be an Android APK package (.apk extension).");
       return;
     }
 
-    if (file.size > 100 * 1024 * 1024) {
-      setValidationError("File exceeds maximum allowed upload size of 100 MB.");
+    if (file.size > maxUploadMb * 1024 * 1024) {
+      setValidationError(`File exceeds the configured maximum upload size of ${maxUploadMb} MB.`);
       return;
     }
 
@@ -142,13 +156,24 @@ export default function NewTestWizard({
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={uploadAvailable ? 0 : -1}
+            aria-label="Choose Android APK file"
+            aria-disabled={!uploadAvailable}
+            onKeyDown={(event) => {
+              if (uploadAvailable && (event.key === "Enter" || event.key === " ")) {
+                event.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            onClick={() => { if (uploadAvailable) fileInputRef.current?.click(); }}
           >
             <input
               ref={fileInputRef}
               type="file"
               accept=".apk"
               style={{ display: "none" }}
+              disabled={!uploadAvailable}
               onChange={handleFileChange}
             />
 
@@ -179,7 +204,7 @@ export default function NewTestWizard({
               <div className="upload-placeholder">
                 <Upload size={32} />
                 <b>Drag and drop your Android APK here, or click to browse</b>
-                <p>Supports .apk packages up to 100 MB. Binary signature is validated before upload.</p>
+                <p>Supports .apk packages up to {maxUploadMb} MB. Binary signature is validated before upload.</p>
               </div>
             )}
           </div>
@@ -201,9 +226,11 @@ export default function NewTestWizard({
 
           <div className="wizard-persona-grid">
             {personas.map((p) => (
-              <div
+              <button
+                type="button"
                 key={p.id}
                 className={"wizard-persona-card " + (selectedPersona === p.id ? "selected" : "")}
+                aria-pressed={selectedPersona === p.id}
                 onClick={() => onSelectPersona(p.id)}
               >
                 <div className="persona-top">
@@ -230,13 +257,34 @@ export default function NewTestWizard({
                     <b>{p.down_kbps} kbps</b>
                   </div>
                   <div>
-                    <small>Packet Drop</small>
+                    <small>Packet loss</small>
                     <b>{p.packet_loss_pct}%</b>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
+            <button
+              type="button"
+              className={"wizard-persona-card " + (selectedPersona === "custom" ? "selected" : "")}
+              aria-pressed={selectedPersona === "custom"}
+              onClick={() => onSelectPersona("custom")}
+            >
+              <div className="persona-top">
+                <div className="persona-title-group">
+                  <strong>Custom persona</strong>
+                  <small>Your own device and network</small>
+                </div>
+                <span className="risk-badge medium">CUSTOM</span>
+              </div>
+              <p className="persona-desc">Set RAM, CPU cores, screen, storage, battery saver, bandwidth, latency, loss, resets and outage length. Every value is applied on the emulator.</p>
+            </button>
           </div>
+          {selectedPersona === "custom" && (
+            <CustomPersonaBuilder value={customPersona} onChange={onCustomPersonaChange} />
+          )}
+          <p className="worker-defaults-note">
+            Persona values are requested targets, not proof that every condition is applied. The worker verifies supported latency/bandwidth and reversible battery/storage controls; packet loss and CPU throttling are unsupported, while RAM is report-only.
+          </p>
         </div>
 
         {/* Step 3: Exploration & Telemetry Options */}
@@ -249,11 +297,7 @@ export default function NewTestWizard({
           <div className="wizard-settings-row">
             <div className="setting-box">
               <label htmlFor="monkey-events">Automated UI Exploration</label>
-              <select
-                id="monkey-events"
-                value={interactionCount}
-                onChange={(e) => setInteractionCount(Number(e.target.value))}
-              >
+              <select id="monkey-events" value={interactionCount} disabled aria-describedby="worker-defaults-note">
                 <option value={50}>50 Throttled Monkey Events (Quick Smoke)</option>
                 <option value={100}>100 Throttled Monkey Events (Recommended)</option>
                 <option value={200}>200 Throttled Monkey Events (Deep Stress)</option>
@@ -266,7 +310,7 @@ export default function NewTestWizard({
                 <input
                   type="checkbox"
                   checked={enableGfxinfo}
-                  onChange={(e) => setEnableGfxinfo(e.target.checked)}
+                  disabled
                 />
                 <span>Capture Frame Render Jank (`dumpsys gfxinfo`)</span>
               </label>
@@ -275,12 +319,13 @@ export default function NewTestWizard({
                 <input
                   type="checkbox"
                   checked={enableMeminfo}
-                  onChange={(e) => setEnableMeminfo(e.target.checked)}
+                  disabled
                 />
                 <span>Capture Memory Footprint (`dumpsys meminfo PSS`)</span>
               </label>
             </div>
           </div>
+          <p id="worker-defaults-note" className="worker-defaults-note">These are the current worker defaults. Per-run monkey-event and telemetry overrides are not yet supported by the run-registration API, so these controls are read-only and will not imply a custom configuration.</p>
         </div>
 
         {/* Action Summary & Submit */}

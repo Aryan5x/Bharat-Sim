@@ -34,6 +34,7 @@ import {
 
 import PersonaPanel from "./components/PersonaPanel";
 import UploadPanel from "./components/UploadPanel";
+import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from "./components/CustomPersonaBuilder";
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
@@ -45,6 +46,9 @@ import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import InferenceLoader from "./components/Animated/InferenceLoader";
 import ParticleField from "./components/Effects/ParticleField";
+import { downloadAnalysisPdf } from "./pdfExport";
+import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, uploadApkSigned, type SignedApkUploadTicket } from "./storageUpload";
+import { enterDemoMode, isDemoMode, readSession } from "./auth";
 
 // Lazy-loaded routes for code-splitting and rapid initial paint
 const LandingPage = lazy(() => import("./components/LandingPage"));
@@ -53,8 +57,6 @@ const NewTestWizard = lazy(() => import("./components/NewTestWizard"));
 const CompareRunsView = lazy(() => import("./components/CompareRunsView"));
 const SettingsView = lazy(() => import("./components/SettingsView"));
 const RunDetailView = lazy(() => import("./components/RunDetailView"));
-import { clearPendingApkUpload, getPendingApkUpload, savePendingApkUpload, uploadApkResumable, type SignedApkUploadTicket } from "./storageUpload";
-import { isDemoMode, readSession } from "./auth";
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 // API_DOCS_URL kept for future use
@@ -65,9 +67,9 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const previewMode = isDemoMode();
-
   const [personas, setPersonas] = useState<Persona[]>(fallbackPersonas);
   const [selected, setSelected] = useState("budget-android");
+  const [customPersona, setCustomPersona] = useState<CustomPersona>(DEFAULT_CUSTOM_PERSONA);
   const [runs, setRuns] = useState<Run[]>([]);
   const [analysis, setAnalysis] = useState<Analysis | null>(() => previewMode ? null : loadSavedAnalysis(readSession()?.user?.id));
   const [logText, setLogText] = useState("");
@@ -183,17 +185,38 @@ export default function App() {
       if (capabilities?.database_persistence !== true || capabilities?.apk_upload !== true) {
         throw new Error("Run registration is unavailable until production PostgreSQL and private APK storage are configured.");
       }
+      if (selected === "custom") {
+        const problems = customPersonaErrors(customPersona);
+        if (problems.length) throw new Error("Fix the custom persona first: " + problems.join("; "));
+      }
+      const personaFields = selected === "custom" ? { persona_id: "custom", custom_persona: customPersona } : { persona_id: selected };
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
         if (!globalThis.crypto?.subtle) throw new Error("Secure file hashing is unavailable in this browser.");
         const digest = await crypto.subtle.digest("SHA-256", await targetFile.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
         let ticket = getPendingApkUpload(sha256, targetFile);
+        if (ticket && !ticket.signed_upload_url) {
+          // Tickets from the old resumable flow cannot be completed; start fresh.
+          clearPendingApkUpload(sha256);
+          ticket = null;
+        }
+        if (ticket) {
+          // Only resume when the server still has this run waiting for its upload;
+          // a deleted, cancelled or already-uploaded run needs a fresh ticket.
+          const resumable = await api<Run>("/api/v1/runs/" + encodeURIComponent(ticket.run_id))
+            .then((existing) => existing.status === "awaiting_worker")
+            .catch(() => false);
+          if (!resumable) {
+            clearPendingApkUpload(sha256);
+            ticket = null;
+          }
+        }
         if (!ticket) {
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ persona_id: selected, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
           });
           savePendingApkUpload(sha256, targetFile, ticket);
         } else {
@@ -203,14 +226,15 @@ export default function App() {
           setNotice("Uploading APK securely… " + percentage + "%");
         };
         try {
-          await uploadApkResumable(targetFile, sha256, ticket, uploadProgress);
+          if (ticket.signed_upload_url) await uploadApkSigned(targetFile, ticket, uploadProgress);
+          else await uploadApkResumable(targetFile, sha256, ticket, uploadProgress);
         } catch (uploadError) {
           if (!(uploadError instanceof Error) || !uploadError.message.includes("fresh upload ticket")) throw uploadError;
           clearPendingApkUpload(sha256);
           ticket = await api<SignedApkUploadTicket>("/api/v1/uploads/sign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ persona_id: selected, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
+            body: JSON.stringify({ ...personaFields, filename: targetFile.name, size_bytes: targetFile.size, sha256 })
           });
           savePendingApkUpload(sha256, targetFile, ticket);
           setNotice("The previous upload expired. Restarting securely with a fresh upload ticket…");
@@ -227,7 +251,8 @@ export default function App() {
           throw new Error("Large APK upload is unavailable until private Supabase Storage is configured. This deployment can accept files up to 4 MB.");
         }
         const body = new FormData();
-        body.append("persona_id", selected);
+        body.append("persona_id", personaFields.persona_id);
+        if (selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
         body.append("apk", targetFile);
         run = await api<Run & { message: string }>("/api/v1/runs", {
           method: "POST",
@@ -255,6 +280,10 @@ export default function App() {
   }
 
   async function analyzeLogs(text = logText, personaId = selected) {
+    if (previewMode || (!readSession() && import.meta.env.PROD)) {
+      setError("Log analysis is a private workspace feature. Sign in to analyze logs and save or export reports.");
+      return;
+    }
     if (!text.trim()) {
       setError("Paste logcat output first.");
       return;
@@ -307,7 +336,12 @@ export default function App() {
     a.href = url;
     a.download = "bharatsim-analysis-" + analysis.id.slice(0, 8) + ".json";
     a.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportReportPdf() {
+    if (!analysis) return;
+    downloadAnalysisPdf(analysis);
   }
 
   return (
@@ -576,6 +610,7 @@ export default function App() {
                 <LandingPage
                   onStartTesting={() => navigate("/new-test")}
                   onExplorePlanner={() => {
+                    enterDemoMode();
                     navigate("/");
                     window.setTimeout(() => {
                       document.getElementById("risk-planner")?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -596,9 +631,14 @@ export default function App() {
                   onSelectPersona={setSelected}
                   busy={busy}
                   uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
-                  lockedReason={previewMode ? "Sign in to register and execute private APK runs." : undefined}
+                  maxUploadMb={capabilities?.max_upload_mb ?? 150}
+                  lockedReason={previewMode
+                    ? "Sign in to register and execute private APK runs."
+                    : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
                   onSubmit={submitApkFile}
                   onCancel={() => navigate("/")}
+                  customPersona={customPersona}
+                  onCustomPersonaChange={setCustomPersona}
                 />
               }
             />
@@ -607,17 +647,33 @@ export default function App() {
             <Route
               path="/compare"
               element={
-                <CompareRunsView
-                  runs={runs}
-                  onBack={() => navigate("/")}
-                />
+                previewMode ? (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <ShieldCheck size={26} />
+                      <b>Private run comparison</b>
+                      <p>Sign in to compare owner-scoped completed runs.</p>
+                    </div>
+                  </section>
+                ) : capabilities?.run_comparison === true ? (
+                  <CompareRunsView runs={runs} onBack={() => navigate("/")} />
+                ) : (
+                  <section className="panel full-panel">
+                    <div className="empty-state">
+                      <CircleAlert size={26} />
+                      <b>Run comparison unavailable</b>
+                      <p>Persistent PostgreSQL is not configured for this deployment. Comparison is disabled rather than generating sample metrics.</p>
+                      <button type="button" className="secondary-button" onClick={() => navigate("/")}>Back to overview</button>
+                    </div>
+                  </section>
+                )
               }
             />
 
             {/* Settings route */}
             <Route
               path="/settings"
-              element={<SettingsView />}
+              element={<SettingsView capabilities={capabilities} apiStatus={apiStatus} />}
             />
 
             {/* Test runs list route */}
@@ -681,7 +737,7 @@ export default function App() {
                       </button>
                     </div>
                   ) : (
-                    <RunsTable runs={runs} personas={personas} />
+                    <RunsTable runs={runs} personas={personas} onDeleted={() => refresh(true)} />
                   )}
                 </section>
               }
@@ -707,9 +763,14 @@ export default function App() {
                       <p>Findings are heuristic signals, not confirmed root causes.</p>
                     </div>
                     {analysis && (
-                      <button className="secondary-button" onClick={exportReport}>
-                        <ArrowDownToLine size={15} /> Export JSON
-                      </button>
+                      <div className="report-export-actions">
+                        <button className="secondary-button" onClick={exportReportPdf}>
+                          <ArrowDownToLine size={15} /> Export PDF
+                        </button>
+                        <button className="secondary-button" onClick={exportReport}>
+                          <ArrowDownToLine size={15} /> Export JSON
+                        </button>
+                      </div>
                     )}
                   </div>
 
