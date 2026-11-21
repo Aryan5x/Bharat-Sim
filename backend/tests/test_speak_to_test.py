@@ -262,10 +262,10 @@ def scenario_block(dup_ok: bool, pending_ok: bool, final_ok: bool, status: str =
             ]}
 
 
-def run(rid, sha, scen, status="completed", crashes=0, spec_hash="aaaaaaaaaaaaaaaa"):
+def run(rid, sha, scen, status="completed", crashes=0, persona="budget-android"):
     return {"id": rid, "status": status, "apk_sha256": sha,
             "result": {"scenario": scen, "constrained": {"signals": {"crashes": crashes}}} if scen is not None else {},
-            "scenario": {"scenario_id": "upi-pending-retry", "spec_hash": spec_hash}}
+            "scenario": {"scenario_id": "upi-pending-retry", "spec_hash": "aaaaaaaaaaaaaaaa", "spec": {"persona_id": persona}}}
 
 
 ORIGINAL = run("o", "sha-original", scenario_block(False, False, True))
@@ -302,7 +302,7 @@ def test_fixproof_not_reproduced():
     run("c", "sha-fixed", scenario_block(True, True, True), status="queued"),           # worker has not run it
     run("c", "sha-fixed", None),                                                       # no scenario executed
     run("c", "sha-fixed", scenario_block(True, True, True, status="blocked")),          # assertions not executed
-    run("c", "sha-fixed", scenario_block(True, True, True), spec_hash="bbbbbbbbbbbbbbbb"),  # different spec
+    run("c", "sha-fixed", scenario_block(True, True, True), persona="edge-village"),  # different persona
 ])
 def test_fixproof_never_verifies_an_unexecuted_or_incomparable_fix(candidate):
     v = testspec.fixproof(ORIGINAL, candidate)
@@ -347,3 +347,18 @@ def test_rule_based_spec_is_valid_for_odd_inputs():
         spec = testspec.rule_based_spec(text or "x")
         built = testspec.build_spec(spec, text, {"provider": "rule-based fallback"})
         assert built["execution"]["mode"] in {"scenario", "generic", "needs_clarification", "blocked"}
+
+
+def test_scenario_spec_identity_ignores_model_wording(monkeypatch):
+    monkeypatch.setattr(main, "chat_json", lambda *a, **k: model_reply(conditions=["slow_network"], journey="order_tracking",
+                                                                       clarifications_needed=["Which journey?"]))
+    a = interpret(HINGLISH)
+    monkeypatch.setattr(main, "chat_json", lambda *a, **k: model_reply(conditions=["server_delay", "network_drop"]))
+    b = interpret(HINGLISH)
+    assert a["spec_hash"] == b["spec_hash"]
+    assert a["journey"] == "payment" and a["clarifications_needed"] == []
+
+
+def test_fenced_model_json_is_accepted():
+    content = "```json" + chr(10) + model_reply()["content"] + chr(10) + "```"
+    assert testspec.parse_model_output(content).matched_scenario == "upi-pending-retry"
