@@ -1,10 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Activity, ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { authConfigured, enterDemoMode, exitDemoMode, isDemoMode, readSession, refreshSession, signIn, signOut, signUp, type UserSession } from "./auth";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
-  const location = useLocation();
   const [session, setSession] = useState<UserSession | null>(() => authConfigured ? readSession() : null);
   const [demoMode, setDemoMode] = useState(() => isDemoMode());
   const [checking, setChecking] = useState(authConfigured);
@@ -52,8 +51,6 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     }, delay);
     return () => window.clearTimeout(timer);
   }, [session]);
-
-  if (!session && location.pathname === "/landing") return <>{children}</>;
   if (!authConfigured) return <>{children}</>;
   if (checking) return <div className="auth-screen"><LoaderCircle className="auth-spin" /><p>Restoring secure session…</p></div>;
 
