@@ -20,7 +20,7 @@ import java.net.URL;
  * the background, recycle list rows, tolerate slow networks and retry with backoff.
  */
 public class MainActivity extends Activity {
-    static final String FEED_URL = "https://raw.githubusercontent.com/Aryan5x/Bharat-Sim/finale/fixtures/feed.bin";
+    static final String FEED_URL = "https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/main/fixtures/feed.bin";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private TextView status;

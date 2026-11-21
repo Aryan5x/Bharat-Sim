@@ -26,7 +26,7 @@ import java.util.List;
  *  - a large image cache is held in memory from the first launch.
  */
 public class MainActivity extends Activity {
-    static final String FEED_URL = "https://raw.githubusercontent.com/Aryan5x/Bharat-Sim/finale/fixtures/feed.bin";
+    static final String FEED_URL = "https://raw.githubusercontent.com/kaustubhdua/Bharat-Sim/main/fixtures/feed.bin";
     static final List<byte[]> IMAGE_CACHE = new ArrayList<>();
 
     private TextView status;
