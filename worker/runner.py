@@ -163,9 +163,12 @@ def apply_emulator_network_profile(
         evidence.update({"control_plane": {"status": "unsupported", "reason": "Target is not an Android Emulator serial"}})
         return evidence
 
+    # Android Emulator's documented unrestricted profile is "full", not
+    # a zero-kbps cap. Zero/zero is the baseline persona's no-throttling sentinel.
+    speed_profile = "full" if down_kbps == 0 and up_kbps == 0 else f"{up_kbps}:{down_kbps}"
     commands = [
         ("delay", ["adb", "-s", serial, "emu", "network", "delay", str(latency_ms) if latency_ms else "none"]),
-        ("speed", ["adb", "-s", serial, "emu", "network", "speed", f"{up_kbps}:{down_kbps}"]),
+        ("speed", ["adb", "-s", serial, "emu", "network", "speed", speed_profile]),
     ]
     command_evidence: dict[str, object] = {}
     for name, command in commands:
