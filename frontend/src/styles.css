@@ -2967,3 +2967,11 @@ svg { flex-shrink: 0; }
   .app-shell { width: 100%; min-width: 0; overflow-x: clip; }
   .content { min-width: 0; }
 }
+
+/* WCAG AA contrast on the always-light sign-in card (ArgosX a11y finding) */
+.auth-card .auth-brand b{color:#1e3928!important}
+.auth-card .auth-brand small{color:#4f5f52!important}
+.auth-card .auth-eyebrow{color:#286b3d!important}
+.auth-card .auth-copy,.auth-card p,.auth-card .auth-foot{color:#56655a!important}
+.auth-card label{color:#33463a!important}
+.auth-card .auth-landing-link{color:#1d5fbf!important}

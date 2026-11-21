@@ -306,10 +306,19 @@ def delete_private_object(object_path: str) -> None:
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Interactive API docs and the OpenAPI schema enumerate internal routes, so they
+# are disabled in production unless an operator explicitly opts in.
+_EXPOSE_API_DOCS = (
+    APP_ENV not in {"production", "prod"}
+    or os.getenv("BHARATSIM_EXPOSE_API_DOCS", "false").strip().lower() == "true"
+)
 app = FastAPI(
     title="BharatSim API",
     version="0.1.0",
     description="Evidence-first Android resilience testing. APK execution requires a separately provisioned worker.",
+    docs_url="/docs" if _EXPOSE_API_DOCS else None,
+    redoc_url="/redoc" if _EXPOSE_API_DOCS else None,
+    openapi_url="/openapi.json" if _EXPOSE_API_DOCS else None,
 )
 allowed_origins = [x.strip() for x in os.getenv("BHARATSIM_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if x.strip()]
 app.add_middleware(
@@ -329,9 +338,9 @@ SUPABASE_STORAGE_ORIGIN = (
 CONTENT_SECURITY_POLICY = "; ".join([
     "default-src 'self'",
     "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob:",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://fonts.gstatic.com",
     "media-src 'self' blob: data:",
     f"connect-src 'self' {SUPABASE_ORIGIN} {SUPABASE_STORAGE_ORIGIN}".strip(),
     "worker-src 'self' blob:",
@@ -2306,10 +2315,50 @@ def compare_runs(payload: CompareRunsRequest, request: Request):
         "details": comparison["summary"],
     }
 
+PUBLIC_CAPABILITIES = {
+    # Anonymous visitors (public preview, crawlers) only learn what the preview can do.
+    "authenticated": False,
+    "log_analysis": True, "risk_planner": True, "failure_fingerprinting": True, "bharat_score": True,
+    "evaluator_scenarios": True,
+    "database_persistence": False, "apk_upload": False, "direct_apk_upload": False,
+    "analysis_persistence": False, "run_comparison": False, "worker_dispatch": False,
+    "android_execution": False, "sarvam_translation": False, "sarvam_audio_tts": False,
+    "notes": ["Sign in to see deployment capabilities and to upload APKs."],
+}
+
+
+def _caller_is_authenticated(request: Request) -> bool:
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("bearer "):
+        return False
+    token = header.split(" ", 1)[1].strip()
+    if not token or len(token) > 4096:
+        return False
+    try:
+        verify_supabase_access_token(token)
+        return True
+    except Exception:
+        return False
+
+
 @app.get("/api/v1/capabilities")
-def capabilities():
+def capabilities(request: Request = None):  # type: ignore[assignment]
+    # HTTP callers always get a Request; direct in-process calls (tests) do not.
+    if request is not None and AUTH_REQUIRED and not _caller_is_authenticated(request):
+        return dict(PUBLIC_CAPABILITIES)
+    try:
+        return _capabilities_payload()
+    except Exception:
+        # Never surface a 5xx from a status endpoint: report what is known to be safe.
+        return {**PUBLIC_CAPABILITIES, "authenticated": True, "notes": ["Capability check is temporarily unavailable; retry shortly."]}
+
+
+def _capabilities_payload():
     persistent_database_required = requires_persistent_database()
-    database_available = database_is_available() if persistent_database_required else True
+    try:
+        database_available = database_is_available() if persistent_database_required else True
+    except Exception:
+        database_available = False
     worker = worker_dispatch_configured()
     sarvam_configured = len(get_sarvam_api_key()) >= 16
     # Private APK intake can persist a run while it waits for an approved worker.
@@ -2318,6 +2367,7 @@ def capabilities():
     upload_available = database_available and upload_storage_available
     direct_upload_available = database_available and STORAGE_ENABLED
     return {
+        "authenticated": True,
         "database_persistence": database_available,
         "max_upload_mb": MAX_UPLOAD_BYTES // (1024 * 1024),
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,

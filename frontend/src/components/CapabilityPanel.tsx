@@ -97,7 +97,7 @@ export default function CapabilityPanel({ capabilities, loading }: CapabilityPan
           <div className="capability-group-title"><Activity size={15} /><h3>Emulator network controls</h3></div>
           <div className="capability-row"><span>Latency</span><Status label={network.latency ? "Supported" : "Unsupported"} tone={network.latency ? "good" : "off"} /></div>
           <div className="capability-row"><span>Bandwidth</span><Status label={network.bandwidth ? "Supported" : "Unsupported"} tone={network.bandwidth ? "good" : "off"} /></div>
-          <div className="capability-row"><span>Control readback</span><Status label={network.configuration_readback ? "Supported" : "Unsupported"} tone={network.configuration_readback ? "good" : "off"} /></div>
+          <div className="capability-row"><span>Control read-back</span><Status label={network.configuration_readback ? "Supported" : "Unsupported"} tone={network.configuration_readback ? "good" : "off"} /></div>
           <div className="capability-row"><span>Packet loss</span><Status label={network.packet_loss ? "Supported" : "Unsupported"} tone={network.packet_loss ? "good" : "off"} /></div>
           <div className="capability-row"><span>Outage and recovery</span><Status label={network.outage_and_recovery ? "Supported" : "Unsupported"} tone={network.outage_and_recovery ? "good" : "off"} /></div>
           <div className="capability-row"><span>Host network shaping</span><Status label={capabilities.network_shaping ? "Supported" : "Unsupported"} tone={capabilities.network_shaping ? "good" : "off"} /></div>
@@ -110,7 +110,7 @@ export default function CapabilityPanel({ capabilities, loading }: CapabilityPan
         <div><b>Persona condition support</b><span>Actual backend declarations</span></div>
         <div className="condition-chips">
           {conditions.supported.map((item) => <span className="condition-chip supported" key={item}><CheckCircle2 size={12} />{humanize(item)}</span>)}
-          {conditions.control_plane_verifiable.map((item) => <span className="condition-chip verifiable" key={item}><Clock3 size={12} />{humanize(item)} · control readback</span>)}
+          {conditions.control_plane_verifiable.map((item) => <span className="condition-chip verifiable" key={item}><Clock3 size={12} />{humanize(item)} · control read-back</span>)}
           {conditions.report_only.map((item) => <span className="condition-chip report-only" key={item}><Clock3 size={12} />{humanize(item)} · report-only</span>)}
           {conditions.unsupported.map((item) => <span className="condition-chip unsupported" key={item}><XCircle size={12} />{humanize(item)} · unsupported</span>)}
         </div>
