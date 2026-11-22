@@ -34,6 +34,7 @@ from .anomaly_detector import detect_regressions
 from .evaluator_scenarios import get_all_scenarios, get_scenario_by_id
 from . import testspec
 from .sarvam import SarvamNotConfigured, chat_json, transcribe_audio, translate_text
+from .gemini import is_gemini_configured, gemini_chat_json, get_gemini_api_key
 from jwt import PyJWKClient
 from jwt.exceptions import InvalidTokenError
 
@@ -2803,6 +2804,15 @@ async def speak_interpret(payload: SpeakInterpretRequest, request: Request):
                   else "Sarvam is rate limiting requests" if isinstance(exc, SarvamRateLimited)
                   else f"Sarvam output was rejected ({str(exc)[:120]})" if isinstance(exc, ValueError)
                   else "Sarvam was unavailable")
+        if is_gemini_configured():
+            try:
+                g_res = await asyncio.to_thread(gemini_chat_json, testspec.SYSTEM_PROMPT, prompt, testspec.model_json_schema())
+                model_spec = testspec.parse_model_output(g_res["content"])
+                interpreter = {"provider": "gemini", "model": g_res["model"], "request_id": g_res["request_id"],
+                               "latency_ms": g_res["latency_ms"], "fallback": False, "redacted_input": clean != payload.text.strip()}
+                return testspec.build_spec(model_spec, clean, interpreter)
+            except Exception:
+                pass
         model_spec = testspec.rule_based_spec(clean)
         interpreter = {"provider": "rule-based fallback", "model": None, "request_id": None, "latency_ms": None,
                        "fallback": True, "fallback_reason": reason, "redacted_input": clean != payload.text.strip()}
@@ -3079,7 +3089,8 @@ def _capabilities_payload():
         "apk_upload": upload_available, "direct_apk_upload": direct_upload_available,
         "log_analysis": True, "analysis_persistence": database_available, "risk_planner": True,
         "failure_fingerprinting": True, "bharat_score": True,
-        "ml_classifier": True, "sarvam_audio_tts": sarvam_configured, "evaluator_scenarios": True, "run_comparison": database_available,
+        "ml_classifier": True, "sarvam_audio_tts": sarvam_configured, "sarvam_translation": sarvam_configured,
+        "gemini_enabled": is_gemini_configured(), "evaluator_scenarios": True, "run_comparison": database_available,
         "android_execution": False,
         "worker_dispatch": worker,
         "network_shaping": False,

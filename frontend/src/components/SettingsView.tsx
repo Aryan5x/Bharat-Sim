@@ -148,8 +148,12 @@ export default function SettingsView({ capabilities, apiStatus }: SettingsViewPr
               <span className={"badge-tag " + (capabilities?.ml_classifier ? "success" : "")}>{capabilities?.ml_classifier ? "TF-IDF centroid classifier available" : "Classifier unavailable"}</span>
             </div>
             <div className="info-row">
-              <span>Sarvam Bulbul TTS:</span>
-              <span className={"badge-tag " + (capabilities?.sarvam_audio_tts ? "success" : "")}>{capabilities?.sarvam_audio_tts ? "Provider configured" : "Not configured (SARVAM_API_KEY required)"}</span>
+              <span>Sarvam AI (Saaras + Bulbul):</span>
+              <span className={"badge-tag " + (capabilities?.sarvam_audio_tts ? "success" : "")}>{capabilities?.sarvam_audio_tts ? "Configured · Voice STT/TTS ready" : "Not configured (SARVAM_API_KEY)"}</span>
+            </div>
+            <div className="info-row">
+              <span>Google Gemini AI:</span>
+              <span className={"badge-tag " + (capabilities?.gemini_enabled ? "success" : "")}>{capabilities?.gemini_enabled ? "Configured · 1.5/2.5 Flash ready" : "Not configured (GEMINI_API_KEY)"}</span>
             </div>
             <div className="info-row">
               <span>Artifact Storage:</span>

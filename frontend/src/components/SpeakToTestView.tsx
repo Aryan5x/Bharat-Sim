@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, CircleAlert, Clock3, FileUp, LoaderCircle, Mic, ShieldCheck, Sparkles, Square, XCircle } from "lucide-react";
 import { type Persona, type Run } from "../api";
+import SarvamAudioPlayer from "./SarvamAudioPlayer";
 import {
   fetchSampleBuild,
   interpretRequest,
@@ -370,7 +371,12 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
                 <b>{spec.language_detected}</b>
               </p>
             </div>
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+              <SarvamAudioPlayer
+                text={`${spec.objective}. ${spec.execution.reason || ""}`}
+                defaultLang={spec.language_detected === "ta-IN" ? "ta-IN" : spec.language_detected === "mr-IN" ? "mr-IN" : "hi-IN"}
+                label="Voice Briefing"
+              />
               <span className={"risk-badge " + (spec.execution.eligible ? "low" : spec.execution.mode === "blocked" ? "critical" : "medium")}>
                 {spec.execution.mode === "scenario" ? "SCENARIO" : spec.execution.mode === "generic" ? "GENERIC RUN" : spec.execution.mode === "blocked" ? "BLOCKED" : "NEEDS DETAIL"}
               </span>
