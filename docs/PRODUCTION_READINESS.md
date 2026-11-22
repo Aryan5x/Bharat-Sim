@@ -23,6 +23,14 @@ This document distinguishes repository implementation, CI fixture evidence, conn
 | Accessibility | Responsive Playwright widths and basic semantic/accessibility smoke tests are in CI. | Manual keyboard, screen-reader, focus, contrast and real-device review. |
 | Deployment | Unified Vercel build and container smoke pass on previously tested heads. | Exact final PR SHA deployed to Production and authenticated production smoke. |
 
+## Current Production API probe — 22 Nov 2026
+
+A live GET against the deployed Production API returned:
+- `GET /health/ready`: HTTP 503; `status=not_ready`, `database=unavailable`, `private_storage=unavailable`, `authentication=configured`, `apk_execution_worker=not_configured`, `worker_online=false`.
+- `GET /api/v1/capabilities`: HTTP 200; log analysis, risk planner, Failure DNA and evaluator scenarios are enabled, but `database_persistence=false`, `apk_upload=false`, `analysis_persistence=false`, `run_comparison=false`, `worker_dispatch=false`, `android_execution=false`, `sarvam_translation=false` and `sarvam_audio_tts=false`.
+
+The production deployment currently points to commit `76f5b7e6`, not the current release PR. The runtime probe is the authoritative statement of what the deployed service can do today; environment-variable presence and direct SQL access from the Supabase connector do not override it.
+
 ## 1. Authoritative Supabase project and schema
 
 The Vercel project `bharat-sim-81g2` is configured with browser `VITE_SUPABASE_URL=https://hkyieaovolkethovyenb.supabase.co`. Its environment metadata comment identifies this as the canonical active Supabase project for BharatSim browser Auth and private Storage. The server-side `SUPABASE_URL` metadata comment identifies the same canonical project. The connected Supabase account lists `common 1` (`hkyieaovolkethovyenb`) as `ACTIVE_HEALTHY`.
