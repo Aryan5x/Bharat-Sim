@@ -9,9 +9,7 @@ import {
   CircleAlert,
   Clock3,
   FileSearch,
-  FlaskConical,
   LoaderCircle,
-  RefreshCw,
   ShieldCheck,
   Smartphone,
   X
@@ -35,7 +33,6 @@ import {
 import PersonaPanel from "./components/PersonaPanel";
 import UploadPanel from "./components/UploadPanel";
 import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from "./components/CustomPersonaBuilder";
-import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
 import PlannerPanel from "./components/PlannerPanel";
@@ -53,13 +50,10 @@ import { enterDemoMode, isDemoMode, readSession } from "./auth";
 // Lazy-loaded routes for code-splitting and rapid initial paint
 const LandingPage = lazy(() => import("./components/LandingPage"));
 const DashboardOverview = lazy(() => import("./components/DashboardOverview"));
-const NewTestWizard = lazy(() => import("./components/NewTestWizard"));
-const CompareRunsView = lazy(() => import("./components/CompareRunsView"));
-const SettingsView = lazy(() => import("./components/SettingsView"));
+const TestStudioView = lazy(() => import("./components/TestStudioView"));
+const RunsHubView = lazy(() => import("./components/RunsHubView"));
+const LabSettingsView = lazy(() => import("./components/LabSettingsView"));
 const RunDetailView = lazy(() => import("./components/RunDetailView"));
-const SpeakToTestView = lazy(() => import("./components/SpeakToTestView"));
-const FixProofView = lazy(() => import("./components/FixProofView"));
-const ConnectLaptopView = lazy(() => import("./components/ConnectLaptopView"));
 import { loadSavedAnalysis, saveAnalysisForSession } from "./reportStore";
 
 // API_DOCS_URL kept for future use
@@ -98,19 +92,21 @@ export default function App() {
   const currentTab = location.pathname.startsWith("/runs")
     ? "runs"
     : location.pathname.startsWith("/analysis")
-    ? "analysis"
+    ? "runs"
     : location.pathname.startsWith("/compare")
-    ? "compare"
+    ? "runs"
+    : location.pathname.startsWith("/fixproof")
+    ? "runs"
+    : location.pathname.startsWith("/test")
+    ? "test"
+    : location.pathname.startsWith("/speak")
+    ? "test"
     : location.pathname.startsWith("/new-test")
-    ? "new-test"
+    ? "test"
     : location.pathname.startsWith("/settings")
     ? "settings"
-    : location.pathname.startsWith("/speak")
-    ? "speak"
-    : location.pathname.startsWith("/fixproof")
-    ? "fixproof"
     : location.pathname.startsWith("/connect")
-    ? "connect"
+    ? "settings"
     : location.pathname.startsWith("/landing")
     ? "landing"
     : "overview";
@@ -643,137 +639,75 @@ export default function App() {
               }
             />
 
-            {/* Step-by-Step Test Setup Wizard route */}
+            {/* Unified Test Studio (Test Lab) */}
             <Route
-              path="/new-test"
+              path="/test"
               element={
-                <NewTestWizard
+                <TestStudioView
                   personas={personas}
                   selectedPersona={selected}
                   onSelectPersona={setSelected}
+                  previewMode={previewMode}
                   busy={busy}
                   uploadAvailable={!previewMode && capabilities?.database_persistence === true && capabilities?.apk_upload === true}
                   maxUploadMb={capabilities?.max_upload_mb ?? 500}
                   lockedReason={previewMode
                     ? "Sign in to register and execute private APK runs."
                     : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
-                  onSubmit={submitApkFile}
-                  onCancel={() => navigate("/")}
+                  onSubmitRun={submitApkFile}
+                  runs={runs}
                   customPersona={customPersona}
                   onCustomPersonaChange={setCustomPersona}
                 />
               }
             />
+            {/* Backward-compatibility routes for Test Lab */}
+            <Route path="/new-test" element={<Navigate to="/test?mode=manual" replace />} />
+            <Route path="/speak" element={<Navigate to="/test?mode=speak" replace />} />
+            <Route path="/speak-to-test" element={<Navigate to="/test?mode=speak" replace />} />
 
-            <Route
-              path="/speak"
-              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} runs={runs} />}
-            />
-            <Route path="/speak-to-test" element={<Navigate to="/speak" replace />} />
-            <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
-            <Route path="/fix-proof" element={<Navigate to="/fixproof" replace />} />
-            <Route path="/connect" element={<ConnectLaptopView previewMode={previewMode} />} />
-            <Route path="/connect-laptop" element={<Navigate to="/connect" replace />} />
-
-            {/* Comparative Telemetry & Anomaly Analysis route */}
-            <Route
-              path="/compare"
-              element={
-                previewMode ? (
-                  <section className="panel full-panel">
-                    <div className="empty-state">
-                      <ShieldCheck size={26} />
-                      <b>Private run comparison</b>
-                      <p>Sign in to compare owner-scoped completed runs.</p>
-                    </div>
-                  </section>
-                ) : capabilities?.run_comparison === true ? (
-                  <CompareRunsView runs={runs} onBack={() => navigate("/")} />
-                ) : (
-                  <section className="panel full-panel">
-                    <div className="empty-state">
-                      <CircleAlert size={26} />
-                      <b>Run comparison unavailable</b>
-                      <p>Persistent PostgreSQL is not configured for this deployment. Comparison is disabled rather than generating sample metrics.</p>
-                      <button type="button" className="secondary-button" onClick={() => navigate("/")}>Back to overview</button>
-                    </div>
-                  </section>
-                )
-              }
-            />
-
-            {/* Settings route */}
-            <Route
-              path="/settings"
-              element={<SettingsView capabilities={capabilities} apiStatus={apiStatus} />}
-            />
-
-            {/* Test runs list route */}
+            {/* Unified Runs & Evidence Hub */}
             <Route
               path="/runs"
               element={
-                <section className="panel full-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <div className="section-kicker">RUN HISTORY</div>
-                      <h2>Test sessions</h2>
-                      <p>Only worker-confirmed states count as execution results.</p>
-                    </div>
-                    <button
-                      className="icon-button"
-                      onClick={() => void refresh()}
-                      aria-label="Refresh test runs"
-                      disabled={loading}
-                    >
-                      <RefreshCw size={15} className={loading ? "spin" : ""} />
-                    </button>
-                  </div>
-
-                  {loading && runs.length === 0 ? (
-                    <div className="empty-state">
-                      <LoaderCircle className="spin" size={28} />
-                      <b>Loading test runs…</b>
-                      <p>Fetching test sessions and execution history from the API.</p>
-                    </div>
-                  ) : apiStatus === "offline" ? (
-                    <div className="alert error-alert" role="alert">
-                      <CircleAlert size={18} />
-                      <span>API is down or unreachable. Unable to load test runs.</span>
-                    </div>
-                  ) : previewMode ? (
-                    <div className="empty-state">
-                      <div className="empty-icon"><ShieldCheck size={22} /></div>
-                      <b>Private run history</b>
-                      <p>Sign in to view saved test runs, worker reports and lifecycle evidence.</p>
-                    </div>
-                  ) : capabilities?.database_persistence !== true ? (
-                    <div className="empty-state">
-                      <div className="empty-icon">
-                        <FlaskConical size={22} />
-                      </div>
-                      <b>Run history unavailable</b>
-                      <p>Persistent PostgreSQL is not configured for this deployment. No saved run history is being reported.</p>
-                    </div>
-                  ) : runs.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-icon">
-                        <FlaskConical size={22} />
-                      </div>
-                      <b>No runs registered</b>
-                      <p>Return to Overview to upload an APK and select a persona.</p>
-                      <button
-                        className="secondary-button"
-                        onClick={() => navigate("/")}
-                      >
-                        Back to overview
-                      </button>
-                    </div>
-                  ) : (
-                    <RunsTable runs={runs} personas={personas} onDeleted={() => refresh(true)} />
-                  )}
-                </section>
+                <RunsHubView
+                  runs={runs}
+                  personas={personas}
+                  loading={loading}
+                  apiStatus={apiStatus}
+                  previewMode={previewMode}
+                  capabilities={capabilities}
+                  onRefresh={() => refresh(true)}
+                  analysis={analysis}
+                  logText={logText}
+                  setLogText={setLogText}
+                  onAnalyzeLogs={analyzeLogs}
+                  analysisBusy={analysisBusy}
+                  onExportJson={exportReport}
+                  onExportPdf={exportReportPdf}
+                />
               }
             />
+            {/* Backward-compatibility routes for Runs Hub */}
+            <Route path="/compare" element={<Navigate to="/runs?tab=compare" replace />} />
+            <Route path="/fixproof" element={<Navigate to="/runs?tab=fixproof" replace />} />
+            <Route path="/fix-proof" element={<Navigate to="/runs?tab=fixproof" replace />} />
+
+            {/* Unified Lab & Settings Hub */}
+            <Route
+              path="/settings"
+              element={
+                <LabSettingsView
+                  capabilities={capabilities}
+                  apiStatus={apiStatus}
+                  previewMode={previewMode}
+                  workers={workers}
+                />
+              }
+            />
+            {/* Backward-compatibility routes for Lab & Settings */}
+            <Route path="/connect" element={<Navigate to="/settings?tab=workers" replace />} />
+            <Route path="/connect-laptop" element={<Navigate to="/settings?tab=workers" replace />} />
 
             {/* Detailed run view route */}
             <Route

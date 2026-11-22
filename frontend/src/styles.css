@@ -3554,3 +3554,112 @@
 .remove-apk-button:hover{color:var(--danger)}
 .recent-runs-preview{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .recent-runs-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+
+
+/* ==========================================================================
+   Consolidated Hub Layout & Segmented Navigation (Simplified Architecture)
+   ========================================================================== */
+.hub-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.hub-header h2 {
+  font-family: var(--display, 'Plus Jakarta Sans', sans-serif);
+  font-size: 24px;
+  font-weight: 700;
+  margin: 4px 0 6px;
+  color: var(--text-primary);
+}
+
+.hub-header p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin: 0;
+  max-width: 600px;
+}
+
+.segmented-nav {
+  display: inline-flex;
+  background: var(--bg-surface-elevated, #161A26);
+  border: 1px solid var(--border-default, #222638);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.segmented-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.segmented-tab:hover {
+  color: var(--text-primary, #f8fafc);
+  background: var(--bg-surface-hover, #1e2436);
+}
+
+.segmented-tab.active {
+  background: var(--accent-surface, rgba(118, 103, 248, 0.15));
+  border-color: var(--accent-border, rgba(118, 103, 248, 0.35));
+  color: var(--accent-text, #9A8BFF);
+}
+
+.segmented-tab .tab-badge {
+  font-size: 9px;
+  font-family: var(--mono, monospace);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(118, 103, 248, 0.2);
+  color: #9A8BFF;
+  border: 1px solid rgba(118, 103, 248, 0.4);
+}
+
+.segmented-tab .tab-badge.online {
+  background: rgba(54, 201, 149, 0.15);
+  color: #36C995;
+  border-color: rgba(54, 201, 149, 0.35);
+}
+
+.segmented-tab .tab-count {
+  font-size: 10px;
+  font-family: var(--mono, monospace);
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--bg-surface-base, #0F121C);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+
+.nav-badge-pill {
+  margin-left: auto;
+  font-size: 9px;
+  font-family: var(--mono, monospace);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(118, 103, 248, 0.15);
+  color: #9A8BFF;
+  border: 1px solid rgba(118, 103, 248, 0.3);
+}
+
+.test-studio-hub,
+.runs-hub-view,
+.lab-settings-hub {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

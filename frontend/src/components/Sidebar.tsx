@@ -1,20 +1,14 @@
 import {
   Layers3,
   FlaskConical,
-  FileSearch,
-  GitCompare,
+  Activity,
   Settings,
-  PlusCircle,
   Moon,
   Sun,
   Smartphone,
   ChevronLeft,
   ChevronRight,
-  LogOut,
-  Flame,
-  Mic,
-  ShieldCheck,
-  Laptop
+  LogOut
 } from "lucide-react";
 import { useTheme } from "../theme";
 import { type Worker } from "../api";
@@ -85,17 +79,7 @@ export default function Sidebar({
       <nav className="sidebar-nav">
         <button
           type="button"
-          className={"nav-item " + (currentTab === "landing" ? "active" : "")}
-          onClick={() => onSelectTab("landing")}
-          title="Product Showcase Landing Page"
-        >
-          <Flame size={17} />
-          {!collapsed && <span>Platform Showcase</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "overview" ? "active" : "")}
+          className={"nav-item " + (currentTab === "overview" || currentTab === "landing" ? "active" : "")}
           onClick={() => onSelectTab("overview")}
           title="Overview & Dashboard"
         >
@@ -105,51 +89,26 @@ export default function Sidebar({
 
         <button
           type="button"
-          className={"nav-item " + (currentTab === "speak" ? "active" : "")}
-          onClick={() => onSelectTab("speak")}
-          title="Speak-to-Test with Sarvam AI"
-        >
-          <Mic size={17} />
-          {!collapsed && <span>Speak to Test</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "fixproof" ? "active" : "")}
-          onClick={() => onSelectTab("fixproof")}
-          title="FixProof: verify a fix"
-        >
-          <ShieldCheck size={17} />
-          {!collapsed && <span>FixProof</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "connect" ? "active" : "")}
-          onClick={() => onSelectTab("connect")}
-          title="Connect your laptop as a test worker"
-        >
-          <Laptop size={17} />
-          {!collapsed && <span>Connect a Laptop</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "new-test" ? "active" : "")}
-          onClick={() => onSelectTab("new-test")}
-          title="Configure New Test"
-        >
-          <PlusCircle size={17} />
-          {!collapsed && <span>New Test Run</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "runs" ? "active" : "")}
-          onClick={() => onSelectTab("runs")}
-          title="Test Execution History"
+          className={"nav-item " + (currentTab === "test" || currentTab === "speak" || currentTab === "new-test" ? "active" : "")}
+          onClick={() => onSelectTab("test")}
+          title="Test Lab: Speak-to-Test or Configure Persona"
         >
           <FlaskConical size={17} />
+          {!collapsed && (
+            <>
+              <span>Test Lab</span>
+              <span className="nav-badge-pill">TEST</span>
+            </>
+          )}
+        </button>
+
+        <button
+          type="button"
+          className={"nav-item " + (currentTab === "runs" || currentTab === "compare" || currentTab === "fixproof" || currentTab === "analysis" ? "active" : "")}
+          onClick={() => onSelectTab("runs")}
+          title="Test Runs, Telemetry Comparison & FixProof"
+        >
+          <Activity size={17} />
           {!collapsed && (
             <>
               <span>Test Runs</span>
@@ -160,32 +119,12 @@ export default function Sidebar({
 
         <button
           type="button"
-          className={"nav-item " + (currentTab === "analysis" ? "active" : "")}
-          onClick={() => onSelectTab("analysis")}
-          title="Logcat & ML Failure Analysis"
-        >
-          <FileSearch size={17} />
-          {!collapsed && <span>Log Analysis</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "compare" ? "active" : "")}
-          onClick={() => onSelectTab("compare")}
-          title="Compare Telemetry Anomaly"
-        >
-          <GitCompare size={17} />
-          {!collapsed && <span>Run Comparison</span>}
-        </button>
-
-        <button
-          type="button"
-          className={"nav-item " + (currentTab === "settings" ? "active" : "")}
+          className={"nav-item " + (currentTab === "settings" || currentTab === "connect" ? "active" : "")}
           onClick={() => onSelectTab("settings")}
-          title="Settings & Preferences"
+          title="Lab Workers & Settings"
         >
           <Settings size={17} />
-          {!collapsed && <span>Settings</span>}
+          {!collapsed && <span>Lab & Workers</span>}
         </button>
       </nav>
 

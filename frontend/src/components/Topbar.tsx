@@ -24,16 +24,17 @@ export default function Topbar({
   onNavigateTab
 }: TopbarProps) {
   const tabTitles: Record<string, string> = {
-    overview: "Overview & Dashboard",
-    speak: "Speak to Test",
-    fixproof: "FixProof",
-    connect: "Connect a Laptop",
-    "new-test": "Configure New Test",
-    runs: "Test Runs",
-    analysis: "Logcat & ML Analysis",
-    compare: "Telemetry Anomaly Comparison",
-    landing: "Platform Showcase",
-    settings: "Workspace Settings"
+    overview: "Overview",
+    test: "Test Lab",
+    speak: "Test Lab · Speak to Test",
+    "new-test": "Test Lab · Configure Persona",
+    runs: "Test Runs & Evidence",
+    fixproof: "Test Runs · FixProof",
+    analysis: "Test Runs · Log Analysis",
+    compare: "Test Runs · Comparison",
+    settings: "Lab & Workers",
+    connect: "Lab & Workers · Connect Laptop",
+    landing: "Platform Showcase"
   };
 
   const apiStatusStyle =

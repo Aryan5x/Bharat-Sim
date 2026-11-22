@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 
 import { Activity, ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { authConfigured, enterDemoMode, exitDemoMode, isDemoMode, readSession, refreshSession, signIn, signOut, signUp, type UserSession } from "./auth";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [session, setSession] = useState<UserSession | null>(() => authConfigured ? readSession() : null);
   const [demoMode, setDemoMode] = useState(() => isDemoMode());

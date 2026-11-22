@@ -1,15 +1,14 @@
 import {
   Smartphone,
   FlaskConical,
-  FileSearch,
   Gauge,
   ArrowUpRight,
   ShieldCheck,
   Clock3,
   ChevronRight,
-  Layers3,
   Activity,
-  Plus
+  Mic,
+  Laptop
 } from "lucide-react";
 import {
   type Persona,
@@ -133,26 +132,35 @@ export default function DashboardOverview({
           className="quick-action-pill primary"
           onClick={() => onNavigateTab("new-test")}
         >
-          <Plus size={15} />
+          <FlaskConical size={15} />
           <span>Launch New Test</span>
         </button>
 
         <button
           type="button"
           className="quick-action-pill"
-          onClick={() => onNavigateTab("analysis")}
+          onClick={() => onNavigateTab("speak")}
         >
-          <FileSearch size={15} />
-          <span>Analyze Android Logcat</span>
+          <Mic size={15} />
+          <span>Speak to Test (Sarvam AI)</span>
         </button>
 
         <button
           type="button"
           className="quick-action-pill"
-          onClick={() => onNavigateTab("compare")}
+          onClick={() => onNavigateTab("runs")}
         >
-          <Layers3 size={15} />
-          <span>Compare Telemetry Anomaly</span>
+          <Activity size={15} />
+          <span>Test Runs & FixProof</span>
+        </button>
+
+        <button
+          type="button"
+          className="quick-action-pill"
+          onClick={() => onNavigateTab("connect")}
+        >
+          <Laptop size={15} />
+          <span>Connect a Laptop Worker</span>
         </button>
       </div>
 

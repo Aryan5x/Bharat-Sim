@@ -310,6 +310,15 @@ def rule_based_spec(text: str) -> ModelSpec:
     devanagari = bool(re.search(r"[ऀ-ॿ]", text))
     latin_hindi = bool(re.search(r"\b(hai|nahi|karo|mein|toh|kya|ke|ki)\b", t))
     lang = "hi-IN" if devanagari else "hinglish" if latin_hindi else "en-IN"
+    symptom = ("crash" if _has(t, "crash")
+               else "freeze" if _has(t, "freeze")
+               else "slow_start" if any(k in t for k in ("slow to open", "late open", "der se khul", "startup"))
+               else "out_of_memory" if any(k in t for k in ("memory", "ram", "oom"))
+               else "storage_error" if _has(t, "storage")
+               else "network_failure" if (_has(t, "network_error") or _has(t, "slow") or _has(t, "drop") or "timeout" in t or "load" in t or "download" in t)
+               else "wrong_result" if _has(t, "pending") or _has(t, "duplicate")
+               else "other")
+    clarifications = [] if (journey != "other" or symptom != "other" or bool(text.strip())) else ["Which user journey should be tested (for example payment, form submit or upload)?"]
 
     return ModelSpec(
         symptom=symptom,

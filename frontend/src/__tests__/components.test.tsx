@@ -5,7 +5,6 @@ import UploadPanel from "../components/UploadPanel";
 import ScoreRing from "../components/ScoreRing";
 import FindingCard from "../components/FindingCard";
 import PersonaPanel from "../components/PersonaPanel";
-import CompareRunsView from "../components/CompareRunsView";
 import RunsTable from "../components/RunsTable";
 import CapabilityPanel from "../components/CapabilityPanel";
 import EvidenceSynthesisPanel from "../components/EvidenceSynthesisPanel";
