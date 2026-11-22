@@ -1034,3 +1034,152 @@ footer {
   .topbar { padding: 0 12px; }
   .full-panel { padding: 16px; }
 }
+
+/* ==========================================================================
+   THEME GUARD (loaded last): surfaces and text follow the active theme.
+   Earlier layers hard-code light or dark colours with !important; these rules
+   use the theme tokens so light mode is light and dark mode is dark.
+   ========================================================================== */
+:root[data-theme] .worker-card { background: var(--bg-surface-elevated) !important; border-color: var(--border-default) !important; }
+:root[data-theme] .worker-card b { color: var(--text-primary) !important; }
+:root[data-theme] .worker-card small { color: var(--text-muted) !important; }
+
+:root[data-theme] .run-timeline { background: var(--bg-surface) !important; border-color: var(--border-default) !important; }
+:root[data-theme] .run-timeline-heading b,
+:root[data-theme] .run-timeline li b { color: var(--text-primary) !important; }
+:root[data-theme] .run-timeline-heading > span,
+:root[data-theme] .run-timeline li small,
+:root[data-theme] .section-kicker { color: var(--text-muted) !important; }
+:root[data-theme] .run-timeline li p { color: var(--text-secondary) !important; }
+:root[data-theme] .run-timeline li { border-left-color: var(--border-default) !important; }
+:root[data-theme] .run-timeline li:last-child { border-left-color: transparent !important; }
+:root[data-theme] .timeline-empty { color: var(--text-muted) !important; }
+
+:root[data-theme] .panel,
+:root[data-theme] .evidence-section,
+:root[data-theme] .finding-card,
+:root[data-theme] .metric-card,
+:root[data-theme] .comparison-card,
+:root[data-theme] .persona-detail,
+:root[data-theme] .modal-dialog,
+:root[data-theme] .category-card,
+:root[data-theme] .spec-block,
+:root[data-theme] .pack-card,
+:root[data-theme] .assistant-turn,
+:root[data-theme] .ai-issue { background: var(--bg-surface) !important; border-color: var(--border-default) !important; color: var(--text-primary) !important; }
+
+:root[data-theme] .score-summary,
+:root[data-theme] .condition-summary-bar,
+:root[data-theme] .evidence-box,
+:root[data-theme] .spec-json,
+:root[data-theme] .recommendation,
+:root[data-theme] .limitations { background: var(--bg-subtle) !important; border-color: var(--border-default) !important; color: var(--text-secondary) !important; }
+
+:root[data-theme] .evidence-section h3,
+:root[data-theme] .panel-heading h2,
+:root[data-theme] .finding-title h3,
+:root[data-theme] .score-copy h3,
+:root[data-theme] .summary-item b,
+:root[data-theme] .category-top b,
+:root[data-theme] .spec-block > b,
+:root[data-theme] .assistant-turn b,
+:root[data-theme] .explain-result h3,
+:root[data-theme] .recommendation b,
+:root[data-theme] .limitations > b { color: var(--text-primary) !important; }
+
+:root[data-theme] .section-desc,
+:root[data-theme] .panel-heading p,
+:root[data-theme] .summary-item small,
+:root[data-theme] .finding-kind,
+:root[data-theme] .speak-note,
+:root[data-theme] .no-evidence,
+:root[data-theme] .evidence-note,
+:root[data-theme] .category-card p,
+:root[data-theme] .finding-card > p,
+:root[data-theme] .explain-result,
+:root[data-theme] .assistant-turn p { color: var(--text-secondary) !important; }
+
+:root[data-theme] .evidence-box code { color: var(--text-secondary) !important; }
+:root[data-theme] table th,
+:root[data-theme] .mini-evidence-table th { background: var(--bg-subtle) !important; color: var(--text-muted) !important; border-color: var(--border-default) !important; }
+:root[data-theme] table td,
+:root[data-theme] .mini-evidence-table td { color: var(--text-secondary) !important; border-color: var(--border-subtle) !important; }
+
+:root[data-theme] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+:root[data-theme] select,
+:root[data-theme] textarea { background: var(--bg-surface) !important; color: var(--text-primary) !important; border-color: var(--border-default) !important; }
+:root[data-theme] input::placeholder,
+:root[data-theme] textarea::placeholder { color: var(--text-dim) !important; }
+
+:root[data-theme] .secondary-button,
+:root[data-theme] .chip-button,
+:root[data-theme] .icon-button { background: var(--bg-surface) !important; color: var(--text-primary) !important; border-color: var(--border-default) !important; }
+:root[data-theme] .chip-button.active { background: var(--accent-surface, rgba(37,99,235,.1)) !important; border-color: var(--border-focus) !important; }
+:root[data-theme] .text-button { color: var(--border-focus) !important; }
+
+:root[data-theme] .voice-phase { margin-top: 10px; font-size: 13px; color: var(--text-secondary); }
+:root[data-theme] .voice-phase.listening { color: #16a34a; }
+:root[data-theme] .voice-phase.speaking { color: var(--border-focus); }
+
+/* Theme guard, part 2: issues found by a contrast scan of every page in both themes */
+:root[data-theme] .nav-label,
+:root[data-theme] .nav-count,
+:root[data-theme] .recent-info small,
+:root[data-theme] .field-hint,
+:root[data-theme] main small,
+:root[data-theme] .planner-config-footer span,
+:root[data-theme] .scenario-title small,
+:root[data-theme] footer span,
+:root[data-theme] .api-state span,
+:root[data-theme] .sidebar-bottom > p { color: var(--text-muted) !important; }
+
+:root[data-theme] .breadcrumbs b,
+:root[data-theme] .breadcrumb-current,
+:root[data-theme] .recent-info b,
+:root[data-theme] .planner-field > span,
+:root[data-theme] .scenario-title b,
+:root[data-theme] .runs-count b,
+:root[data-theme] .run-header-meta b,
+:root[data-theme] .run-detail-header h2,
+:root[data-theme] main h1, :root[data-theme] main h2, :root[data-theme] main h3 { color: var(--text-primary) !important; }
+
+:root[data-theme="light"] .status-pill.online, :root[data-theme="light"] .worker-card .status-pill,
+:root[data-theme="light"] .tab-badge.online { color: #047857 !important; border-color: #6ee7b7 !important; background: #ecfdf5 !important; }
+:root[data-theme="dark"] .status-pill.online, :root[data-theme="dark"] .worker-card .status-pill,
+:root[data-theme="dark"] .tab-badge.online { color: #6ee7b7 !important; border-color: #065f46 !important; background: #052e22 !important; }
+
+:root[data-theme] .avatar { color: var(--text-primary) !important; background: var(--bg-surface-elevated) !important; border-color: var(--border-default) !important; }
+:root[data-theme="light"] .run-warning { background: #fffbeb !important; border-color: #fcd34d !important; color: #92400e !important; }
+:root[data-theme="dark"] .run-warning { background: #2a2010 !important; border-color: #6b4f1d !important; color: #fcd34d !important; }
+
+/* Landing page follows the theme */
+:root[data-theme] .landing-section-alt,
+:root[data-theme] .landing-stats-grid,
+:root[data-theme] .landing-stat-item,
+:root[data-theme] .feature-card,
+:root[data-theme] .persona-showcase-card,
+:root[data-theme] .faq-item,
+:root[data-theme] .landing-cta-section { background: var(--bg-surface) !important; border-color: var(--border-default) !important; color: var(--text-primary) !important; }
+:root[data-theme] .landing-section-alt { background: var(--bg-subtle) !important; }
+:root[data-theme] .landing-stat-number,
+:root[data-theme] .landing-section-title,
+:root[data-theme] .persona-showcase-name,
+:root[data-theme] .faq-question span,
+:root[data-theme] .landing-cta-title,
+:root[data-theme] .landing-footer-brand b,
+:root[data-theme] .feature-card-title { color: var(--text-primary) !important; }
+:root[data-theme] .landing-section-subtitle,
+:root[data-theme] .landing-cta-subtitle,
+:root[data-theme] .feature-card-desc,
+:root[data-theme] .persona-showcase-spec,
+:root[data-theme] .landing-stat-label { color: var(--text-secondary) !important; }
+
+/* Topbar API status: only the first span is the coloured dot; the label is plain text */
+:root[data-theme] .api-state > span + span { background: none !important; box-shadow: none !important; width: auto !important; height: auto !important; border-radius: 0 !important; color: var(--text-secondary) !important; display: inline !important; white-space: nowrap; }
+:root[data-theme] .segmented-tab .tab-count,
+:root[data-theme] .runs-filter > span,
+:root[data-theme] .runs-count,
+:root[data-theme] .workflow-step-content p,
+:root[data-theme] .landing-footer-brand p,
+:root[data-theme] .landing-footer-col h5 { color: var(--text-muted) !important; }
+:root[data-theme] .workflow-step-content h4 { color: var(--text-primary) !important; }

@@ -69,6 +69,9 @@ export default function AiReportAssistant({ runId, runFinished }: { runId: strin
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
+  const [conversing, setConversing] = useState(false);
+  const conversingRef = useRef(false);
+  const [phase, setPhase] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
 
   useEffect(() => {
     api<Obj>("/api/v1/runs/" + encodeURIComponent(runId) + "/developer-report").then(setReport).catch(() => undefined);
@@ -87,14 +90,25 @@ export default function AiReportAssistant({ runId, runFinished }: { runId: strin
     }
   }
 
-  function play(b64?: string | null) {
-    if (!b64) return;
+  function play(b64?: string | null): Promise<void> {
+    if (!b64) return Promise.resolve();
     audioRef.current?.pause();
     const audio = new Audio("data:audio/wav;base64," + b64);
     audioRef.current = audio;
-    audio.onended = () => setPlaying(false);
     setPlaying(true);
-    void audio.play().catch(() => setPlaying(false));
+    setPhase("speaking");
+    return new Promise((resolve) => {
+      const done = () => {
+        setPlaying(false);
+        resolve();
+      };
+      audio.onended = done;
+      audio.onerror = done;
+      audio.onpause = () => {
+        if (audio.currentTime < audio.duration) done();
+      };
+      void audio.play().catch(done);
+    });
   }
 
   function stopAudio() {
@@ -109,6 +123,7 @@ export default function AiReportAssistant({ runId, runFinished }: { runId: strin
     setTurns(history);
     setInput("");
     setAsking(true);
+    setPhase("thinking");
     setChatError("");
     try {
       const res = await api<Obj>("/api/v1/runs/" + encodeURIComponent(runId) + "/assistant", {
@@ -119,12 +134,97 @@ export default function AiReportAssistant({ runId, runFinished }: { runId: strin
       const turn: Turn = { role: "assistant", content: res.answer, translated: res.translated_text, audio: res.audio?.audio_base64 || null,
         cites: (res.cited_evidence || []).map((e: Obj) => e.id) };
       setTurns([...history, turn]);
-      play(turn.audio);
+      await play(turn.audio);
     } catch (err) {
       setChatError(err instanceof Error ? err.message : "The assistant could not answer.");
     } finally {
       setAsking(false);
+      setPhase("idle");
     }
+  }
+
+  /** Record one utterance; stops by itself after ~1.4 s of silence once speech was heard (max 20 s). */
+  function recordUtterance(): Promise<Blob | null> {
+    return new Promise(async (resolve) => {
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        setChatError("Microphone access was blocked. Allow the microphone for this site.");
+        resolve(null);
+        return;
+      }
+      const rec = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      const ctx = new AudioContext();
+      const analyser = ctx.createAnalyser();
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const data = new Uint8Array(analyser.fftSize);
+      let heard = false;
+      let quietSince = 0;
+      const started = Date.now();
+      const timer = window.setInterval(() => {
+        analyser.getByteTimeDomainData(data);
+        let peak = 0;
+        for (const v of data) peak = Math.max(peak, Math.abs(v - 128));
+        const now = Date.now();
+        if (peak > 14) {
+          heard = true;
+          quietSince = 0;
+        } else if (heard) {
+          quietSince = quietSince || now;
+          if (now - quietSince > 1400 && rec.state === "recording") rec.stop();
+        }
+        if ((now - started > 20000 || (!heard && now - started > 8000)) && rec.state === "recording") rec.stop();
+      }, 120);
+      rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+      rec.onstop = () => {
+        window.clearInterval(timer);
+        void ctx.close();
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        resolve(heard ? new Blob(chunks, { type: rec.mimeType || "audio/webm" }) : null);
+      };
+      recRef.current = rec;
+      rec.start();
+      setRecording(true);
+      setPhase("listening");
+    });
+  }
+
+  async function conversationLoop() {
+    while (conversingRef.current) {
+      const blob = await recordUtterance();
+      if (!conversingRef.current) break;
+      if (!blob) {
+        setChatError("I didn't hear anything. Speak after the beep, or press End conversation.");
+        continue;
+      }
+      try {
+        setPhase("thinking");
+        const t = await transcribeVoice(blob);
+        if (!t.transcript.trim()) continue;
+        await ask(t.transcript); // waits until the spoken reply has finished
+      } catch (err) {
+        setChatError(err instanceof Error ? err.message : "Could not transcribe.");
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    }
+    setPhase("idle");
+  }
+
+  function toggleConversation() {
+    if (conversingRef.current) {
+      conversingRef.current = false;
+      setConversing(false);
+      if (recRef.current?.state === "recording") recRef.current.stop();
+      stopAudio();
+      return;
+    }
+    setChatError("");
+    conversingRef.current = true;
+    setConversing(true);
+    void conversationLoop();
   }
 
   async function toggleMic() {
@@ -234,9 +334,9 @@ export default function AiReportAssistant({ runId, runFinished }: { runId: strin
       <section className="panel sarvam-panel ai-assistant" aria-labelledby="assistant-title">
         <div className="panel-heading">
           <div>
-            <div className="section-kicker">VOICE ASSISTANT · SARVAM AI</div>
+            <div className="section-kicker">VOICE DEBUGGING · GEMINI + SARVAM</div>
             <h2 id="assistant-title">Ask about this run</h2>
-            <p>Speak or type a question. Sarvam answers from this run's evidence and speaks the answer back. One question and answer at a time.</p>
+            <p>Start a voice conversation: speak, hear the answer, and keep talking. Gemini cross-questions you to pin down the error using this run's evidence; Sarvam listens, translates and speaks. Turn by turn, not live streaming.</p>
           </div>
         </div>
         <div className="assistant-log">
@@ -256,14 +356,27 @@ export default function AiReportAssistant({ runId, runFinished }: { runId: strin
           <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Answer language">
             {LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
-          <button type="button" className={"secondary-button " + (recording ? "recording" : "")} onClick={() => void toggleMic()} disabled={asking || !runFinished}>
-            {recording ? <Square size={14} /> : <Mic size={14} />} {recording ? "Stop" : "Speak"}
+          <button type="button" className={(conversing ? "danger-button" : "primary-button") + " voice-convo-btn"} onClick={toggleConversation} disabled={!runFinished}>
+            {conversing ? <Square size={14} /> : <Mic size={14} />} {conversing ? "End conversation" : "Start voice conversation"}
           </button>
+          {!conversing && (
+            <button type="button" className={"secondary-button " + (recording ? "recording" : "")} onClick={() => void toggleMic()} disabled={asking || !runFinished}>
+              {recording ? <Square size={14} /> : <Mic size={14} />} {recording ? "Stop" : "Ask once"}
+            </button>
+          )}
           <input className="connect-input assistant-input" value={input} maxLength={600} placeholder="Type a question" onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void ask(input)} disabled={!runFinished} />
           <button type="button" className="primary-button" onClick={() => void ask(input)} disabled={asking || input.trim().length < 2}><Send size={14} /> Ask</button>
           {playing && <button type="button" className="text-button" onClick={stopAudio}><VolumeX size={13} /> Stop audio</button>}
         </div>
+        {conversing && (
+          <p className={"voice-phase " + phase} role="status" aria-live="polite">
+            {phase === "listening" ? "Listening… speak now, I'll reply when you pause."
+              : phase === "thinking" ? "Thinking…"
+              : phase === "speaking" ? "Speaking… I'll listen again when I finish."
+              : "Starting…"}
+          </p>
+        )}
         {chatError && <div className="alert error-alert" role="alert"><CircleAlert size={16} /><span>{chatError}</span></div>}
       </section>
     </>

@@ -20,6 +20,7 @@ import EvidenceSynthesisPanel from "./EvidenceSynthesisPanel";
 import EngineReportView, { isEngineReport } from "./EngineReportView";
 import DiagnosisPanel from "./DiagnosisPanel";
 import AiReportAssistant from "./AiReportAssistant";
+import { downloadDeveloperReportPdf } from "../reportPdf";
 import RunComparisonModal from "./RunComparisonModal";
 import {
   api,
@@ -107,7 +108,28 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
     [id]
   );
 
+  const [exporting, setExporting] = useState(false);
   const handleDownloadReport = async () => {
+    if (!id || !run?.result) return;
+    setError("");
+    setExporting(true);
+    try {
+      // Professional PDF: reuse the latest Gemini developer report, or generate one first.
+      let devReport: Record<string, unknown>;
+      try {
+        devReport = await api<Record<string, unknown>>("/api/v1/runs/" + encodeURIComponent(id) + "/developer-report");
+      } catch {
+        devReport = await api<Record<string, unknown>>("/api/v1/runs/" + encodeURIComponent(id) + "/developer-report", { method: "POST" });
+      }
+      downloadDeveloperReportPdf(devReport);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create the PDF report");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDownloadJson = async () => {
     if (!id || !run?.result) return;
     setError("");
     try {
@@ -279,7 +301,10 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
             onClick={() => void handleDownloadReport()}
             disabled={!run.result || deleting}
           >
-            <Download size={14} /> Export report
+            {exporting ? <LoaderCircle size={14} className="spin" /> : <Download size={14} />} {exporting ? "Building PDF…" : "Export PDF report"}
+          </button>
+          <button className="secondary-button" onClick={() => void handleDownloadJson()} disabled={!run.result || deleting} title="Raw worker evidence as JSON">
+            <Download size={14} /> JSON
           </button>
           <button
             className="danger-button"
@@ -334,6 +359,8 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
           </span>
         </div>
       </div>
+
+      <AiReportAssistant key={"ai-" + run.id} runId={run.id} runFinished={!isRunActive(run.status)} />
 
       <section className="run-timeline">
         <div className="run-timeline-heading">
@@ -400,8 +427,6 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
         reportedProblem={(run as unknown as { scenario?: { spec?: { request_text?: string; objective?: string } } }).scenario?.spec?.request_text
           || (run as unknown as { scenario?: { spec?: { objective?: string } } }).scenario?.spec?.objective}
       />
-
-      <AiReportAssistant key={"ai-" + run.id} runId={run.id} runFinished={!isRunActive(run.status)} />
 
       {/* Empty state when no worker report exists */}
       {!report ? (
