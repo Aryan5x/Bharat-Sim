@@ -202,7 +202,11 @@ export default function App() {
         if (problems.length) throw new Error("Fix the custom persona first: " + problems.join("; "));
       }
       const personaFields = options
-        ? { persona_id: options.personaId, ...(options.scenario ? { scenario: options.scenario } : {}) }
+        ? {
+            persona_id: options.personaId,
+            ...(options.customPersona ? { custom_persona: options.customPersona } : {}),
+            ...(options.scenario ? { scenario: options.scenario } : {})
+          }
         : selected === "custom" ? { persona_id: "custom", custom_persona: customPersona } : { persona_id: selected };
       let run: Run & { message: string };
       if (capabilities?.direct_apk_upload) {
@@ -267,6 +271,7 @@ export default function App() {
         const body = new FormData();
         body.append("persona_id", personaFields.persona_id);
         if (!options && selected === "custom") body.append("custom_persona", JSON.stringify(customPersona));
+        if (options?.customPersona) body.append("custom_persona", JSON.stringify(options.customPersona));
         if (options?.scenario) body.append("scenario", JSON.stringify(options.scenario));
         body.append("apk", targetFile);
         run = await api<Run & { message: string }>("/api/v1/runs", {
@@ -417,7 +422,8 @@ export default function App() {
 
           <Suspense fallback={<InferenceLoader text="Loading BharatSim workspace..." />}>
             <Routes>
-            {/* Overview route */}
+            {/* Overview / Dashboard route (accessible at / and /overview) */}
+            <Route path="/overview" element={<Navigate to="/" replace />} />
             <Route
               path="/"
               element={
@@ -484,6 +490,7 @@ export default function App() {
                         </div>
                       )}
                       <textarea
+                        aria-label="Android logcat evidence"
                         disabled={previewMode}
                         value={logText}
                         onChange={(e) => setLogText(e.target.value)}
@@ -612,7 +619,6 @@ export default function App() {
                       )}
                     </section>
 
-                    
                   </div>
                 </div>
               }
@@ -660,10 +666,13 @@ export default function App() {
 
             <Route
               path="/speak"
-              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
+              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} runs={runs} />}
             />
+            <Route path="/speak-to-test" element={<Navigate to="/speak" replace />} />
             <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
+            <Route path="/fix-proof" element={<Navigate to="/fixproof" replace />} />
             <Route path="/connect" element={<ConnectLaptopView previewMode={previewMode} />} />
+            <Route path="/connect-laptop" element={<Navigate to="/connect" replace />} />
 
             {/* Comparative Telemetry & Anomaly Analysis route */}
             <Route
@@ -818,7 +827,7 @@ export default function App() {
                           ? "Sign in to submit logcat, create private reports and export analysis evidence."
                           : "Paste Android logcat in Overview to create a report with source-line evidence."}
                       </p>
-                      {!previewMode && <button className="primary-button" onClick={() => navigate("/")}>Open log analyzer</button>}
+                      {!previewMode && <button className="primary-button" onClick={() => navigate("/overview")}>Open log analyzer</button>}
                     </div>
                   ) : (
                     <>

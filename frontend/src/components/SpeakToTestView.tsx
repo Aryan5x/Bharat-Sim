@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { CheckCircle2, CircleAlert, Clock3, FileUp, LoaderCircle, Mic, ShieldCheck, Sparkles, Square, XCircle } from "lucide-react";
-import { type Persona } from "../api";
+import { type Persona, type Run } from "../api";
 import {
   fetchSampleBuild,
   interpretRequest,
@@ -11,16 +12,25 @@ import {
   type TestSpec
 } from "../speak";
 
-export type SubmitRunOptions = { personaId: string; scenario: ReturnType<typeof runScenarioPayload> };
+export type SubmitRunOptions = {
+  personaId: string;
+  customPersona?: Record<string, unknown> | null;
+  scenario: ReturnType<typeof runScenarioPayload>;
+};
 
 interface SpeakToTestViewProps {
   personas: Persona[];
   previewMode: boolean;
   busy: boolean;
   onSubmitRun: (file: File, options: SubmitRunOptions) => Promise<void>;
+  runs?: Run[];
 }
 
 const EXAMPLES = [
+  { label: "Crash on 2G", text: "Meri app 2G network par crash ho rahi hai, why is it happening and how can I fix that?" },
+  { label: "Freeze on drop", text: "App freezes when network drops, tell me why and how to fix." },
+  { label: "Out of memory", text: "Images load karte waqt out of memory error se band ho jata hai, fix batao." },
+  { label: "UPI Pending", text: "Mera payment app slow network mein payment karne ke baad pending dikha raha hai. Check karo retry par duplicate request toh nahi hoti." },
   { label: "Hindi", text: "मेरा पेमेंट ऐप धीमे नेटवर्क में पेमेंट के बाद पेंडिंग दिखा रहा है। जाँच करो कि रीट्राई करने पर डुप्लिकेट रिक्वेस्ट तो नहीं जाती।" },
   { label: "Hinglish", text: "Mera payment app slow network mein payment karne ke baad pending dikha raha hai. Check karo ki retry karne par duplicate request toh nahi hoti." },
   { label: "Tamil", text: "என் பேமெண்ட் ஆப் மெதுவான நெட்வொர்க்கில் பணம் செலுத்திய பிறகு pending காட்டுகிறது. மீண்டும் முயற்சி செய்தால் இரண்டு முறை பணம் எடுக்கப்படுகிறதா என்று சோதிக்கவும்." },
@@ -44,7 +54,7 @@ function humanize(value: string): string {
   return value.replaceAll("_", " ");
 }
 
-export default function SpeakToTestView({ personas, previewMode, busy, onSubmitRun }: SpeakToTestViewProps) {
+export default function SpeakToTestView({ personas, previewMode, busy, onSubmitRun, runs = [] }: SpeakToTestViewProps) {
   // The plan survives navigating to a run and back, so the second build can reuse it.
   const [text, setText] = useState(() => loadPlan().text);
   const [spec, setSpec] = useState<TestSpec | null>(() => loadPlan().spec);
@@ -55,6 +65,7 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
   const [packs, setPacks] = useState<ScenarioPack[]>([]);
   const [showJson, setShowJson] = useState(false);
   const [ownApk, setOwnApk] = useState<File | null>(null);
+  const [selectedSample, setSelectedSample] = useState<string | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const stopTimer = useRef<number | null>(null);
@@ -116,6 +127,10 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
         setWorking("transcribe");
         try {
           const result = await transcribeVoice(blob);
+          if (!result.transcript.trim()) {
+            setError("Sarvam did not hear any speech in that recording. Check that the right microphone is selected, speak for a few seconds, then stop.");
+            return;
+          }
           setText(result.transcript);
           setTranscriptNote(`Sarvam ${result.model} heard ${result.language_code || "an Indian language"} in ${result.latency_ms} ms.`);
           if (result.transcript.trim().length >= 3) await interpret(result.transcript);
@@ -150,9 +165,28 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
     }
   }
 
+  async function runGenericSample() {
+    if (!spec) return;
+    setError("");
+    try {
+      const file = await fetchSampleBuild("/samples/fragile-news.apk", "fragile-news.apk");
+      await onSubmitRun(file, {
+        personaId: spec.execution.persona_id,
+        customPersona: spec.execution.custom_persona ?? null,
+        scenario: runScenarioPayload(spec, spec.execution.scenario_id)
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the run.");
+    }
+  }
+
   async function runOwnApk() {
     if (!spec || !ownApk) return;
-    await onSubmitRun(ownApk, { personaId: spec.execution.persona_id, scenario: runScenarioPayload(spec, spec.execution.scenario_id) });
+    await onSubmitRun(ownApk, {
+      personaId: spec.execution.persona_id,
+      customPersona: spec.execution.custom_persona ?? null,
+      scenario: runScenarioPayload(spec, spec.execution.scenario_id)
+    });
   }
 
   return (
@@ -177,20 +211,108 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
           </div>
         )}
 
-        <label className="field-label" htmlFor="speak-text">Your test request</label>
+        {/* Step 1: Choose APK to test */}
+        <div className="speak-section">
+          <label className="field-label">1. Choose APK to test</label>
+          <div className="apk-selector-row">
+            <label className="secondary-button file-upload-button">
+              <FileUp size={14} />
+              <span>{ownApk ? "Change APK" : "Upload your APK"}</span>
+              <input
+                type="file"
+                accept=".apk,application/vnd.android.package-archive"
+                aria-label="Choose your APK"
+                className="sr-only"
+                disabled={busy || previewMode}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) {
+                    setOwnApk(f);
+                    setSelectedSample(null);
+                  }
+                }}
+              />
+            </label>
+
+            <span className="or-divider">or choose sample app:</span>
+
+            <button
+              type="button"
+              className={"chip-button " + (selectedSample === "fragile-news" ? "active" : "")}
+              onClick={() => { setSelectedSample("fragile-news"); setOwnApk(null); }}
+            >
+              📰 Fragile News <small>(General APK · 2G crash)</small>
+            </button>
+            <button
+              type="button"
+              className={"chip-button " + (selectedSample === "bharatpay-original" ? "active" : "")}
+              onClick={() => { setSelectedSample("bharatpay-original"); setOwnApk(null); }}
+            >
+              💳 BharatPay 1.0 <small>(UPI retry bug)</small>
+            </button>
+            <button
+              type="button"
+              className={"chip-button " + (selectedSample === "bharatpay-fixed" ? "active" : "")}
+              onClick={() => { setSelectedSample("bharatpay-fixed"); setOwnApk(null); }}
+            >
+              ✓ BharatPay 1.1 <small>(Fixed)</small>
+            </button>
+          </div>
+
+          {(ownApk || selectedSample) && (
+            <div className="selected-apk-badge">
+              <CheckCircle2 size={14} className="ok" />
+              <span>
+                Target: <b>{ownApk ? ownApk.name : selectedSample === "fragile-news" ? "Fragile News (fragile-news.apk)" : selectedSample === "bharatpay-original" ? "BharatPay Mock 1.0 (original)" : "BharatPay Mock 1.1 (fixed)"}</b>
+                {ownApk ? ` (${(ownApk.size / (1024 * 1024)).toFixed(1)} MB)` : ""}
+              </span>
+              <button
+                type="button"
+                className="text-button remove-apk-button"
+                onClick={() => { setOwnApk(null); setSelectedSample(null); }}
+              >
+                ✕ Clear
+              </button>
+            </div>
+          )}
+
+          {runs && runs.length > 0 && (
+            <div className="recent-runs-preview">
+              <span className="or-divider">or diagnose an existing run:</span>
+              <div className="recent-runs-chips">
+                {runs.slice(0, 3).map((r) => (
+                  <Link key={r.id} to={`/runs/${r.id}`} className="chip-button" title="View run and diagnosis">
+                    <span>{r.apk_name || "APK"}</span>
+                    <small>({r.status})</small>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <label className="field-label" htmlFor="speak-text">2. Describe the problem or ask for a fix</label>
         <textarea
           id="speak-text"
           className="speak-textarea"
           value={text}
           maxLength={1000}
           onChange={(e) => setText(e.target.value)}
-          placeholder="e.g. Mera payment app slow network mein pending dikhata hai. Check karo retry par double charge toh nahi hota."
-          rows={4}
+          placeholder="e.g. Meri app 2G network par crash ho rahi hai, why is it happening and how can I fix that? Or: App freezes on slow connection, ask for fix"
+          rows={3}
         />
         <div className="speak-examples" aria-label="Example requests">
           {EXAMPLES.map((ex) => (
-            <button key={ex.label} type="button" className="chip-button" onClick={() => setText(ex.text)}>
-              {ex.label} example
+            <button
+              key={ex.label}
+              type="button"
+              className="chip-button"
+              onClick={() => {
+                setText(ex.text);
+                void interpret(ex.text);
+              }}
+            >
+              {ex.label}
             </button>
           ))}
         </div>
@@ -221,6 +343,24 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
 
       {spec && (
         <section className="panel full-panel spec-panel" aria-live="polite">
+          {text.trim() && (!spec.request_text || spec.request_text.trim() !== text.trim()) && (
+            <div className="alert notice-alert" role="status" style={{ marginBottom: 14 }}>
+              <CircleAlert size={16} />
+              <span>
+                This plan below is from an earlier request (<b>{spec.objective}</b>). Click <b>Create test plan</b> above to analyze your current request, or{" "}
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setSpec(null);
+                    sessionStorage.removeItem(STORE_KEY);
+                  }}
+                >
+                  dismiss this plan
+                </button>.
+              </span>
+            </div>
+          )}
           <div className="panel-heading">
             <div>
               <div className="section-kicker">INTERPRETED TEST PLAN · {spec.spec_id}</div>
@@ -230,9 +370,22 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
                 <b>{spec.language_detected}</b>
               </p>
             </div>
-            <span className={"risk-badge " + (spec.execution.eligible ? "low" : spec.execution.mode === "blocked" ? "critical" : "medium")}>
-              {spec.execution.mode === "scenario" ? "SCENARIO" : spec.execution.mode === "generic" ? "GENERIC RUN" : spec.execution.mode === "blocked" ? "BLOCKED" : "NEEDS DETAIL"}
-            </span>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className={"risk-badge " + (spec.execution.eligible ? "low" : spec.execution.mode === "blocked" ? "critical" : "medium")}>
+                {spec.execution.mode === "scenario" ? "SCENARIO" : spec.execution.mode === "generic" ? "GENERIC RUN" : spec.execution.mode === "blocked" ? "BLOCKED" : "NEEDS DETAIL"}
+              </span>
+              <button
+                type="button"
+                className="chip-button"
+                title="Discard this test plan"
+                onClick={() => {
+                  setSpec(null);
+                  sessionStorage.removeItem(STORE_KEY);
+                }}
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
           <div className={"alert " + (spec.execution.eligible ? "notice-alert" : "error-alert")}>
@@ -245,6 +398,18 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
               <b>Questions before testing</b>
               <ul>{spec.clarifications_needed.map((q) => <li key={q}>{q}</li>)}</ul>
               <small>Add the answer to your request above and create the plan again.</small>
+            </div>
+          )}
+
+          {spec.symptom && spec.execution.mode !== "scenario" && (
+            <div className="spec-block symptom-block">
+              <b>Problem to check</b>
+              <span>{spec.symptom_label}</span>
+              <small>
+                {spec.symptom_checkable
+                  ? "After the run, BharatSim checks whether this actually happened, then explains why and how to fix it."
+                  : "This can't be detected automatically on any app; the run reports what it did observe and explains it."}
+              </small>
             </div>
           )}
 
@@ -316,17 +481,59 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
           {spec.execution.eligible && (
             <div className="spec-run">
               <div>
-                <div className="section-kicker">YOUR OWN APK</div>
+                <div className="section-kicker">
+                  {ownApk ? "READY TO RUN YOUR APK" : selectedSample ? "READY TO RUN SAMPLE" : (spec.execution.mode === "scenario" ? "YOUR OWN APK" : "RUN IT ON YOUR APK")}
+                </div>
+                <h3>
+                  {ownApk
+                    ? `Run ${ownApk.name} & Diagnose`
+                    : selectedSample === "fragile-news"
+                    ? "Run Fragile News & Diagnose"
+                    : selectedSample === "bharatpay-original"
+                    ? "Run BharatPay Mock 1.0 (original)"
+                    : selectedSample === "bharatpay-fixed"
+                    ? "Run BharatPay Mock 1.1 (fixed)"
+                    : (spec.execution.mode === "scenario" ? "Your own APK" : "Choose your APK or try Fragile News")}
+                </h3>
                 <p>{spec.execution.mode === "scenario"
                   ? "Your APK gets the generic baseline vs persona run; the scenario assertions need the BharatPay Mock fixture and will be reported as blocked for other apps."
-                  : "Runs the baseline vs persona comparison on your APK with this plan attached to the report."}</p>
+                  : `Choose your APK. BharatSim runs it ${spec.execution.custom_persona ? "under the conditions you described" : "on the budget phone"}, compares it with a normal phone, then the run page shows whether the problem happened, why, and how to fix it.`}</p>
               </div>
               <div className="spec-run-actions">
-                <input type="file" accept=".apk,application/vnd.android.package-archive" aria-label="Choose your APK"
-                  onChange={(e) => setOwnApk(e.target.files?.[0] || null)} disabled={busy || previewMode} />
-                <button type="button" className="secondary-button" disabled={!ownApk || busy || previewMode} onClick={() => void runOwnApk()}>
-                  <FileUp size={14} /> Run with this plan
-                </button>
+                {ownApk ? (
+                  <button type="button" className="primary-button" disabled={busy || previewMode} onClick={() => void runOwnApk()}>
+                    {busy ? <LoaderCircle size={14} className="spin" /> : <FileUp size={14} />} Run {ownApk.name} & Diagnose
+                  </button>
+                ) : selectedSample === "fragile-news" ? (
+                  <button type="button" className="primary-button" disabled={busy || previewMode} onClick={() => void runGenericSample()}>
+                    {busy ? <LoaderCircle size={14} className="spin" /> : <FileUp size={14} />} Run Fragile News & Diagnose
+                  </button>
+                ) : selectedSample === "bharatpay-original" ? (
+                  <button type="button" className="primary-button" disabled={busy || previewMode} onClick={() => void runSample("/samples/bharatpay-original.apk", "original")}>
+                    {busy ? <LoaderCircle size={14} className="spin" /> : <FileUp size={14} />} Run BharatPay Mock 1.0
+                  </button>
+                ) : selectedSample === "bharatpay-fixed" ? (
+                  <button type="button" className="primary-button" disabled={busy || previewMode} onClick={() => void runSample("/samples/bharatpay-fixed.apk", "fixed")}>
+                    {busy ? <LoaderCircle size={14} className="spin" /> : <FileUp size={14} />} Run BharatPay Mock 1.1
+                  </button>
+                ) : (
+                  <>
+                    <input type="file" accept=".apk,application/vnd.android.package-archive" aria-label="Choose your APK"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) { setOwnApk(f); setSelectedSample(null); }
+                      }} disabled={busy || previewMode} />
+                    <button type="button" className="secondary-button" disabled={!ownApk || busy || previewMode} onClick={() => void runOwnApk()}>
+                      <FileUp size={14} /> Run with this plan
+                    </button>
+                    {spec.execution.mode === "generic" && (
+                      <button type="button" className="text-button" disabled={busy || previewMode} onClick={() => void runGenericSample()}
+                        title="A small test app (no real data) whose news feed crashes on slow networks">
+                        No APK handy? Try the sample Fragile News app
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}
