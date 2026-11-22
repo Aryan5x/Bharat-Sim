@@ -64,11 +64,16 @@ usermod -aG kvm bharatsim || true
 usermod -aG libvirt bharatsim || true
 
 # Udev rule to guarantee /dev/kvm permissions on every reboot
-cat << 'EOF' > /etc/udev/rules.d/99-kvm4all.rules
-KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"
+cat << 'EOF' > /etc/udev/rules.d/99-bharatsim-kvm.rules
+# KVM is available only to the dedicated worker group; never grant world access.
+KERNEL=="kvm", GROUP="kvm", MODE="0660", OPTIONS+="static_node=kvm"
 EOF
 udevadm control --reload-rules || true
 udevadm trigger --name-match=kvm || true
+if [ -e /dev/kvm ]; then
+    chgrp kvm /dev/kvm
+    chmod 0660 /dev/kvm
+fi
 
 # 4. Install Android Command-Line Tools & SDK
 echo "[4/8] Installing Android SDK and platform-tools..."
@@ -179,7 +184,8 @@ BHARATSIM_API_URL=https://bharat-sim-81g2.vercel.app
 BHARATSIM_WORKER_TOKEN=CHANGEME_AT_LEAST_32_RANDOM_CHARS_SECRET_KEY
 BHARATSIM_WORKER_ID=production-worker-kvm-01
 ANDROID_SERIAL=emulator-5554
-BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=true
+BHARATSIM_ENABLE_LOCAL_APK_EXECUTION=false
+BHARATSIM_WORKER_ENGINE=engine
 BHARATSIM_POLL_SECONDS=5
 BHARATSIM_SMOKE_DURATION_SECONDS=20
 EOF
