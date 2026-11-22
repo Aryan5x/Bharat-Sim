@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-11-21T16:52:39.589751+00:00",
+  "generated_at": "2026-11-21T23:46:24.096467+00:00",
   "interpret": {
     "hindi": {
       "status": 200,
       "request": "मेरा पेमेंट ऐप धीमे नेटवर्क में पेमेंट के बाद पेंडिंग दिखा रहा है। जाँच करो कि रीट्राई करने पर डुप्लिकेट रिक्वेस्ट तो नहीं जाती।",
       "spec": {
-        "spec_id": "STS-9482530157",
-        "spec_hash": "9997fdaca174d116",
+        "spec_id": "STS-2ca560660b",
+        "spec_hash": "5e12d0b70bcaaef6",
         "request_text": "मेरा पेमेंट ऐप धीमे नेटवर्क में पेमेंट के बाद पेंडिंग दिखा रहा है। जाँच करो कि रीट्राई करने पर डुप्लिकेट रिक्वेस्ट तो नहीं जाती।",
         "language_detected": "hi-IN",
-        "objective": "Verify that retrying a payment after a pending state on a slow network does not send a duplicate request.",
+        "objective": "Verify that retrying a payment on a slow network does not send duplicate requests and the pending state is handled correctly.",
         "app_hint": "",
-        "journey": "other",
-        "journey_description": "The user makes a payment on a slow network and sees a pending status, then retries the payment.",
+        "journey": "payment",
+        "journey_description": "A user makes a payment on a slow network and the app shows a pending status, then retries the payment.",
         "persona_id": "budget-android",
         "conditions": [
           "slow_network"
@@ -26,11 +26,14 @@
         ],
         "unsupported_conditions": [],
         "expected_behaviour": [
-          "The app shows a pending state after the initial payment attempt on a slow network.",
-          "Upon retry, the app does not send a duplicate payment request."
+          "The app must display an honest pending state after the initial payment",
+          "upon retry, it must not send a duplicate request",
+          "the final state must match the bank status."
         ],
         "assertions": [
-          "no_duplicate_charge"
+          "no_duplicate_charge",
+          "honest_pending_state",
+          "final_state_matches_bank"
         ],
         "machine_checked_assertions": [
           {
@@ -47,27 +50,33 @@
           }
         ],
         "not_machine_verified": [],
-        "evidence": [],
+        "evidence": [
+          "ui_text",
+          "backend_requests",
+          "logcat"
+        ],
         "matched_scenario": "upi-pending-retry",
         "safety": {
           "flags": [],
           "classification": "controlled-test-only"
         },
-        "clarifications_needed": [
-          "Which user journey should be tested: payment status verification or another specific flow?"
-        ],
+        "clarifications_needed": [],
         "execution": {
           "eligible": true,
           "mode": "scenario",
           "scenario_id": "upi-pending-retry",
           "persona_id": "budget-android",
+          "custom_persona": null,
           "reason": "Runs the 'UPI-style payment pending + retry' scenario with machine-checked assertions on the BharatPay Mock fixture, plus the generic baseline vs persona run."
         },
+        "symptom": "wrong_result",
+        "symptom_label": "the app shows a wrong result or state",
+        "symptom_checkable": true,
         "interpreter": {
           "provider": "sarvam",
           "model": "sarvam-105b",
-          "request_id": "20261121_b281fb2c-07e1-40da-b12b-d8620a7a3f58",
-          "latency_ms": 1000,
+          "request_id": "20261121_f6ae6c6b-7db8-4335-a7d0-5aeae3816650",
+          "latency_ms": 656,
           "fallback": false,
           "redacted_input": false
         }
@@ -77,14 +86,14 @@
       "status": 200,
       "request": "Mera payment app slow network mein payment karne ke baad pending dikha raha hai. Check karo ki retry karne par duplicate request toh nahi hoti.",
       "spec": {
-        "spec_id": "STS-ce615d06ee",
-        "spec_hash": "9997fdaca174d116",
+        "spec_id": "STS-4f503918f4",
+        "spec_hash": "5e12d0b70bcaaef6",
         "request_text": "Mera payment app slow network mein payment karne ke baad pending dikha raha hai. Check karo ki retry karne par duplicate request toh nahi hoti.",
         "language_detected": "hi-IN",
-        "objective": "Verify that retrying a payment on a slow network does not create a duplicate request when the initial payment shows as pending.",
+        "objective": "Verify that the payment app correctly handles a pending state on slow network and does not create duplicate requests on retry.",
         "app_hint": "",
-        "journey": "other",
-        "journey_description": "The user initiates a payment on a slow network, observes a pending state, and then retries the payment to check for duplicate processing.",
+        "journey": "payment",
+        "journey_description": "A user makes a payment over a slow network and sees a pending status, then retries the payment.",
         "persona_id": "budget-android",
         "conditions": [
           "slow_network"
@@ -98,11 +107,14 @@
         ],
         "unsupported_conditions": [],
         "expected_behaviour": [
-          "The app should display an honest pending state after the initial slow-network payment attempt.",
-          "Upon retry, the app must not send a duplicate payment request."
+          "The app should display an honest pending state after the payment",
+          "upon retry, it must not send a duplicate request or charge twice",
+          "the final state should match the bank."
         ],
         "assertions": [
-          "no_duplicate_charge"
+          "no_duplicate_charge",
+          "honest_pending_state",
+          "final_state_matches_bank"
         ],
         "machine_checked_assertions": [
           {
@@ -119,27 +131,33 @@
           }
         ],
         "not_machine_verified": [],
-        "evidence": [],
+        "evidence": [
+          "ui_text",
+          "backend_requests",
+          "logcat"
+        ],
         "matched_scenario": "upi-pending-retry",
         "safety": {
           "flags": [],
           "classification": "controlled-test-only"
         },
-        "clarifications_needed": [
-          "Which user journey should be tested: payment initiation, order tracking, form submission, file upload, or video consultation?"
-        ],
+        "clarifications_needed": [],
         "execution": {
           "eligible": true,
           "mode": "scenario",
           "scenario_id": "upi-pending-retry",
           "persona_id": "budget-android",
+          "custom_persona": null,
           "reason": "Runs the 'UPI-style payment pending + retry' scenario with machine-checked assertions on the BharatPay Mock fixture, plus the generic baseline vs persona run."
         },
+        "symptom": "wrong_result",
+        "symptom_label": "the app shows a wrong result or state",
+        "symptom_checkable": true,
         "interpreter": {
           "provider": "sarvam",
           "model": "sarvam-105b",
-          "request_id": "20261121_136f78fe-8b95-4b66-9939-c6c8bfe9f446",
-          "latency_ms": 1328,
+          "request_id": "20261121_10b5d856-7e9f-4983-a40a-f3989e55c73a",
+          "latency_ms": 672,
           "fallback": false,
           "redacted_input": false
         }
@@ -149,14 +167,14 @@
       "status": 200,
       "request": "app ko achhe se test kar do",
       "spec": {
-        "spec_id": "STS-9bf2c05a92",
+        "spec_id": "STS-1e18cc30ff",
         "spec_hash": "3e6ae4e66110ab5a",
         "request_text": "app ko achhe se test kar do",
         "language_detected": "hi-IN",
-        "objective": "Verify the overall stability and core functionality of the application.",
+        "objective": "Verify that the app functions correctly under general testing conditions.",
         "app_hint": "",
         "journey": "other",
-        "journey_description": "The developer asked to test the app thoroughly without specifying a particular user journey.",
+        "journey_description": "",
         "persona_id": "baseline",
         "conditions": [],
         "supported_conditions": [],
@@ -172,20 +190,24 @@
           "classification": "controlled-test-only"
         },
         "clarifications_needed": [
-          "Which specific user journey or feature should be tested?"
+          "What is the specific user journey to test (e.g., payment, checkout, file upload)?"
         ],
         "execution": {
           "eligible": false,
           "mode": "needs_clarification",
           "scenario_id": null,
           "persona_id": "baseline",
+          "custom_persona": null,
           "reason": "Answer the questions below so the test can be planned."
         },
+        "symptom": "other",
+        "symptom_label": "another problem",
+        "symptom_checkable": false,
         "interpreter": {
           "provider": "sarvam",
           "model": "sarvam-105b",
-          "request_id": "20261121_5da8401f-91e7-4e96-a82d-a6115882a083",
-          "latency_ms": 687,
+          "request_id": "20261121_169c83f3-6055-4df7-8b40-3d5d7cf12156",
+          "latency_ms": 484,
           "fallback": false,
           "redacted_input": false
         }
@@ -195,15 +217,15 @@
       "status": 200,
       "request": "Test my telemedicine app when a phone call comes in and the CPU is throttled on 2G.",
       "spec": {
-        "spec_id": "STS-ede6e7ffed",
-        "spec_hash": "28150d4ef3cb7add",
+        "spec_id": "STS-db8f5f5d44",
+        "spec_hash": "f8a2002c812f0e53",
         "request_text": "Test my telemedicine app when a phone call comes in and the CPU is throttled on 2G.",
         "language_detected": "en-IN",
-        "objective": "Verify that the telemedicine app handles an incoming call and CPU throttling on a 2G network without crashing or losing the session.",
+        "objective": "Verify that the telemedicine app handles an incoming phone call and CPU throttling on a 2G network without crashing or freezing.",
         "app_hint": "",
-        "journey": "video_consultation",
-        "journey_description": "A user is in a telemedicine consultation and an incoming phone call arrives while the device CPU is throttled and the network is 2G.",
-        "persona_id": "edge-village",
+        "journey": "other",
+        "journey_description": "The user is on a video consultation and receives an incoming phone call while the device CPU is throttled on a 2G network.",
+        "persona_id": "custom",
         "conditions": [
           "incoming_call",
           "cpu_throttle",
@@ -229,8 +251,9 @@
           }
         ],
         "expected_behaviour": [
-          "The app remains stable when an incoming call interrupts the telemedicine session on a 2G connection with CPU throttling.",
-          "The app resumes or recovers the session correctly after the incoming call ends."
+          "The video consultation should pause or handle the incoming call gracefully",
+          "the app should remain responsive under CPU throttling on 2G",
+          "session should recover after the call ends."
         ],
         "assertions": [
           "session_recovery"
@@ -246,20 +269,40 @@
           "classification": "controlled-test-only"
         },
         "clarifications_needed": [
-          "Which specific user journey should be tested if the telemedicine consultation involves video, audio, or file upload?"
+          "Which user journey should be tested: video consultation, file upload, form submission, order tracking, or another?"
         ],
         "execution": {
           "eligible": true,
           "mode": "generic",
           "scenario_id": null,
-          "persona_id": "edge-village",
-          "reason": "No scenario pack matches yet, so this becomes a generic baseline vs persona run on your APK. Crash, ANR and out-of-memory signals are measured; the other expectations are not machine-verified."
+          "persona_id": "custom",
+          "custom_persona": {
+            "name": "Your reported conditions",
+            "ram_mb": 2048,
+            "cpu_cores": 2,
+            "screen_width": 720,
+            "screen_height": 1280,
+            "density_dpi": 320,
+            "free_storage_mb": null,
+            "battery_saver": false,
+            "down_kbps": 256,
+            "up_kbps": 96,
+            "latency_min_ms": 300,
+            "latency_max_ms": 600,
+            "packet_loss_pct": 0,
+            "reset_pct": 0,
+            "drop_seconds": 0
+          },
+          "reason": "Runs your APK on the budget-phone emulator under the conditions you described, then checks whether requests fail or time out on a bad network actually happens and explains why from the evidence."
         },
+        "symptom": "network_failure",
+        "symptom_label": "requests fail or time out on a bad network",
+        "symptom_checkable": true,
         "interpreter": {
           "provider": "sarvam",
           "model": "sarvam-105b",
-          "request_id": "20261121_f753760f-d4b4-4000-aae5-8275da99d9d4",
-          "latency_ms": 1156,
+          "request_id": "20261121_8c002248-eca4-4ae1-9582-3941531d7977",
+          "latency_ms": 672,
           "fallback": false,
           "redacted_input": false
         }
@@ -269,14 +312,14 @@
       "status": 200,
       "request": "என் பேமெண்ட் ஆப் மெதுவான நெட்வொர்க்கில் பணம் செலுத்திய பிறகு pending காட்டுகிறது. மீண்டும் முயற்சி செய்தால் இரண்டு முறை பணம் எடுக்கப்படுகிறதா என்று சோதிக்கவும்.",
       "spec": {
-        "spec_id": "STS-77126ae959",
-        "spec_hash": "9997fdaca174d116",
+        "spec_id": "STS-02e835dd7d",
+        "spec_hash": "5e12d0b70bcaaef6",
         "request_text": "என் பேமெண்ட் ஆப் மெதுவான நெட்வொர்க்கில் பணம் செலுத்திய பிறகு pending காட்டுகிறது. மீண்டும் முயற்சி செய்தால் இரண்டு முறை பணம் எடுக்கப்படுகிறதா என்று சோதிக்கவும்.",
         "language_detected": "ta-IN",
-        "objective": "Verify that a payment does not result in a duplicate charge when retried on a slow network after showing a pending state.",
+        "objective": "Verify that the app shows a pending state after payment on a slow network and does not charge the user twice upon retrying.",
         "app_hint": "",
-        "journey": "other",
-        "journey_description": "The user makes a payment on a slow network, sees a pending state, and retries the payment.",
+        "journey": "payment",
+        "journey_description": "User makes a payment on a slow network, sees a pending state, and retries the payment.",
         "persona_id": "budget-android",
         "conditions": [
           "slow_network"
@@ -290,10 +333,11 @@
         ],
         "unsupported_conditions": [],
         "expected_behaviour": [
-          "The app shows a pending state after the initial slow payment attempt.",
-          "When the user retries the payment, the system does not deduct money twice."
+          "App should display a pending state after the initial payment attempt on a slow network",
+          "retrying the payment should not result in a duplicate charge."
         ],
         "assertions": [
+          "honest_pending_state",
           "no_duplicate_charge"
         ],
         "machine_checked_assertions": [
@@ -311,27 +355,33 @@
           }
         ],
         "not_machine_verified": [],
-        "evidence": [],
+        "evidence": [
+          "ui_text",
+          "backend_requests",
+          "logcat"
+        ],
         "matched_scenario": "upi-pending-retry",
         "safety": {
           "flags": [],
           "classification": "controlled-test-only"
         },
-        "clarifications_needed": [
-          "Which user journey should be tested: file upload, form submission, order tracking, or video consultation?"
-        ],
+        "clarifications_needed": [],
         "execution": {
           "eligible": true,
           "mode": "scenario",
           "scenario_id": "upi-pending-retry",
           "persona_id": "budget-android",
+          "custom_persona": null,
           "reason": "Runs the 'UPI-style payment pending + retry' scenario with machine-checked assertions on the BharatPay Mock fixture, plus the generic baseline vs persona run."
         },
+        "symptom": "network_failure",
+        "symptom_label": "requests fail or time out on a bad network",
+        "symptom_checkable": true,
         "interpreter": {
           "provider": "sarvam",
           "model": "sarvam-105b",
-          "request_id": "20261121_0524eda3-f7f4-4255-9e4f-8a9b4cdc1606",
-          "latency_ms": 2250,
+          "request_id": "20261121_f2ad4c37-3c08-4f22-be51-4b9199169c48",
+          "latency_ms": 578,
           "fallback": false,
           "redacted_input": false
         }
@@ -343,26 +393,26 @@
     "language_code": "hi-IN",
     "speaker": "priya",
     "model": "bulbul:v3",
-    "request_id": "20261121_91dbaa63-507e-4542-a250-559498c84516",
+    "request_id": "20261121_750ef83c-526b-4b1e-b71f-f9af6bff18a3",
     "is_fixture": false,
-    "bytes": 365074
+    "bytes": 368838
   },
   "stt_of_tts": {
     "transcript": "नमस्ते, अनुरोध भेजा गया लेकिन पुष्टि प्राप्त नहीं हुई। दोबारा प्रयास करने से पहले स्थिति की जाँच करें।",
     "language_code": "hi-IN",
-    "request_id": "20261121_f4f9b723-a7cd-4858-93cb-a5102d0d57f2",
+    "request_id": "20261121_d32dbdc3-39f9-4607-b036-f0ea7a2b4db2",
     "model": "saaras:v4",
-    "latency_ms": 532
+    "latency_ms": 375
   },
   "tts_tamil": {
-    "request_id": "20261121_9df9c80a-ca80-4411-80b3-48fb8ff523c0",
-    "bytes": 161862
+    "request_id": "20261121_be6428cd-60f0-4035-a286-88f00ca9790d",
+    "bytes": 158098
   },
   "stt_of_tts_tamil": {
-    "transcript": "கோரிக்கை அனுப்பப்பட்டது. ஆனால் உறுதிப்படுத்தல் வரவில்லை.",
+    "transcript": "கோரிக்கை அனுப்பப்பட்டது, ஆனால் உறுதிப்படுத்தல் வரவில்லை.",
     "language_code": "ta-IN",
-    "request_id": "20261121_03df9407-2889-4d07-a74d-7993323fd230",
+    "request_id": "20261121_11dd55a6-32c5-4484-a3c6-298a76035cb0",
     "model": "saaras:v4",
-    "latency_ms": 390
+    "latency_ms": 328
   }
 }

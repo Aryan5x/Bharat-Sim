@@ -3492,9 +3492,7 @@
 .connect-command{user-select:all;max-height:none}
 
 
-/* Final responsive overrides: keep these after the collapsible-sidebar tokens.
-   The later desktop layout tokens otherwise re-apply the fixed sidebar width
-   after the earlier mobile media query and squeeze the dashboard into a column. */
+
 @media (max-width: 720px) {
   .app-shell {
     display: block;

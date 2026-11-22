@@ -17,6 +17,9 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+# Ensure localhost requests in subprocess testing never route through system proxy
+urllib.request.install_opener(urllib.request.build_opener(urllib.request.ProxyHandler({})))
+
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "backend"
 
@@ -60,20 +63,31 @@ def start_api(data_dir: Path, port: int, log_path: Path) -> subprocess.Popen:
     env["BHARATSIM_REQUIRE_API_KEY"] = "false"
     env["BHARATSIM_WORKER_TOKEN"] = "test-worker-token-00000000000000000000000000000000"
     env.pop("BHARATSIM_API_KEY", None)
-    log = log_path.open("ab")
-    proc = subprocess.Popen(
-        [
-            sys.executable, "-m", "uvicorn", "app.main:app",
-            "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
-        ],
-        cwd=BACKEND,
-        env=env,
-        stdout=log,
-        stderr=subprocess.STDOUT,
-    )
-    # Keep the file handle alive with the child until it exits.
-    proc._bharatsim_log_handle = log  # type: ignore[attr-defined]
-    return proc
+    cmd = [
+        sys.executable, "-m", "uvicorn", "app.main:app",
+        "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
+    ]
+    try:
+        log = log_path.open("ab")
+        proc = subprocess.Popen(
+            cmd,
+            cwd=BACKEND,
+            env=env,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        )
+        # Keep the file handle alive with the child until it exits.
+        proc._bharatsim_log_handle = log  # type: ignore[attr-defined]
+        return proc
+    except OSError:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=BACKEND,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        return proc
 
 
 def stop_api(proc: subprocess.Popen) -> None:
