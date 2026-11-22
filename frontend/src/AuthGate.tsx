@@ -1,11 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Activity, ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { authConfigured, enterDemoMode, exitDemoMode, isDemoMode, readSession, refreshSession, signIn, signOut, signUp, type UserSession } from "./auth";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [session, setSession] = useState<UserSession | null>(() => authConfigured ? readSession() : null);
   const [demoMode, setDemoMode] = useState(() => isDemoMode());
   const [checking, setChecking] = useState(authConfigured);
@@ -53,7 +52,6 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     }, delay);
     return () => window.clearTimeout(timer);
   }, [session]);
-  if (!session && location.pathname === "/landing") return <>{children}</>;
   if (!authConfigured) return <>{children}</>;
   if (checking) return <div className="auth-screen"><LoaderCircle className="auth-spin" /><p>Restoring secure session…</p></div>;
 
@@ -63,19 +61,13 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     try {
       if (signupMode) {
         const created = await signUp(email.trim(), password);
-        if (created) {
-          exitDemoMode();
-          setDemoMode(false);
-          setSession(readSession());
-          navigate("/landing");
-        }
+        if (created) { exitDemoMode(); setDemoMode(false); setSession(readSession()); }
         else { setNotice("Account created. Check your email to confirm it, then sign in."); setSignupMode(false); }
       } else {
         const next = await signIn(email.trim(), password);
         exitDemoMode();
         setDemoMode(false);
         setSession(next);
-        navigate("/landing");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
@@ -99,6 +91,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       {children}
     </>
   );
+
+  // The product tour is intentionally public; private workspace routes remain gated.
+  if (!session && location.pathname === "/landing") return <>{children}</>;
 
   if (!session) return (
     <main className="auth-screen">

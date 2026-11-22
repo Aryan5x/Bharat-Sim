@@ -111,9 +111,11 @@ export default function App() {
     ? "fixproof"
     : location.pathname.startsWith("/connect")
     ? "connect"
+    : location.pathname.startsWith("/overview")
+    ? "overview"
     : location.pathname.startsWith("/landing")
     ? "landing"
-    : "overview";
+    : "landing";
 
   async function refresh(silent = false) {
     if (!silent) setLoading(true);
@@ -129,7 +131,8 @@ export default function App() {
 
       // Guest preview is limited to public personas and planning. Do not call
       // protected run-history or worker endpoints and create avoidable 401s.
-      if (previewMode) {
+      const publicLanding = location.pathname === "/landing" && !readSession();
+      if (previewMode || publicLanding) {
         setRuns([]);
         setWorkers([]);
         setNotice("");
@@ -370,7 +373,7 @@ export default function App() {
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => {
-          if (tab === "overview") navigate("/");
+          if (tab === "overview") navigate("/overview");
           else navigate(`/${tab}`);
         }}
         workers={workers}
@@ -389,7 +392,7 @@ export default function App() {
           onRefresh={() => void refresh()}
           onOpenEvaluatorTour={() => setShowEvaluatorModal(true)}
           onNavigateTab={(tab) => {
-            if (tab === "overview") navigate("/");
+            if (tab === "overview") navigate("/overview");
             else navigate(`/${tab}`);
           }}
         />
@@ -422,10 +425,12 @@ export default function App() {
 
           <Suspense fallback={<InferenceLoader text="Loading BharatSim workspace..." />}>
             <Routes>
-            {/* Overview / Dashboard route (accessible at / and /overview) */}
-            <Route path="/overview" element={<Navigate to="/" replace />} />
+            {/* Default post-login home: Platform Showcase */}
+            <Route path="/" element={<Navigate to="/landing" replace />} />
+
+            {/* Overview / Dashboard route */}
             <Route
-              path="/"
+              path="/overview"
               element={
                 <div className="overview-page-wrapper">
                   <DashboardOverview
@@ -437,7 +442,7 @@ export default function App() {
                     apiStatus={apiStatus}
                     previewMode={previewMode}
                     onNavigateTab={(tab) => {
-                      if (tab === "overview") navigate("/");
+                      if (tab === "overview") navigate("/overview");
                       else navigate(`/${tab}`);
                     }}
                     onNavigateRun={(id) => navigate(`/runs/${encodeURIComponent(id)}`)}
@@ -490,6 +495,7 @@ export default function App() {
                         </div>
                       )}
                       <textarea
+                        aria-label="Android logcat evidence"
                         disabled={previewMode}
                         value={logText}
                         onChange={(e) => setLogText(e.target.value)}
@@ -630,7 +636,7 @@ export default function App() {
                   onStartTesting={() => navigate("/new-test")}
                   onExplorePlanner={() => {
                     enterDemoMode();
-                    navigate("/");
+                    navigate("/overview");
                     window.setTimeout(() => {
                       document.getElementById("risk-planner")?.scrollIntoView({ behavior: "smooth", block: "center" });
                     }, 100);
@@ -655,7 +661,7 @@ export default function App() {
                     ? "Sign in to register and execute private APK runs."
                     : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
                   onSubmit={submitApkFile}
-                  onCancel={() => navigate("/")}
+                  onCancel={() => navigate("/overview")}
                   customPersona={customPersona}
                   onCustomPersonaChange={setCustomPersona}
                 />
@@ -664,7 +670,7 @@ export default function App() {
 
             <Route
               path="/speak"
-              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} runs={runs} />}
+              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
             />
             <Route path="/speak-to-test" element={<Navigate to="/speak" replace />} />
             <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
@@ -913,7 +919,7 @@ export default function App() {
                     <CircleAlert size={32} />
                     <b>Page not found</b>
                     <p>The screen you are looking for does not exist.</p>
-                    <button className="secondary-button" onClick={() => navigate("/")}>
+                    <button className="secondary-button" onClick={() => navigate("/overview")}>
                       Back to overview
                     </button>
                   </div>
