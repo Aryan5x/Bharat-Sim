@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleAlert, Download, FileText, LoaderCircle, Mic, Send, Square, Volume2, VolumeX } from "lucide-react";
 import { api } from "../api";
 import { transcribeVoice } from "../speak";
+import { downloadDeveloperReportPdf } from "../reportPdf";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Obj = Record<string, any>;
@@ -175,6 +176,9 @@ export default function AiReportAssistant({ runId, runFinished }: { runId: strin
           </button>
           {report && (
             <>
+              <button type="button" className="primary-button" onClick={() => downloadDeveloperReportPdf(report)}>
+                <Download size={14} /> PDF
+              </button>
               <button type="button" className="secondary-button" onClick={() => download(`bharatsim-report-${runId.slice(0, 8)}-v${report.version}.json`, JSON.stringify(report, null, 2), "application/json")}>
                 <Download size={14} /> JSON
               </button>
