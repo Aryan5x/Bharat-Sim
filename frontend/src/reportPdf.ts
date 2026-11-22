@@ -1,5 +1,17 @@
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import * as autoTableModule from "jspdf-autotable";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// jspdf-autotable's default export resolves differently in Vite (browser) and Node (tests); pick the function.
+const autoTableMod: any = autoTableModule;
+const autoTable: (doc: jsPDF, options: any) => void =
+  (typeof autoTableMod.default === "function" && autoTableMod.default) ||
+  (typeof autoTableMod.default?.default === "function" && autoTableMod.default.default) ||
+  (typeof autoTableMod.autoTable === "function" && autoTableMod.autoTable) ||
+  ((doc: any, options: any) => {
+    autoTableMod.applyPlugin?.(jsPDF);
+    doc.autoTable(options);
+  });
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Obj = Record<string, any>;
