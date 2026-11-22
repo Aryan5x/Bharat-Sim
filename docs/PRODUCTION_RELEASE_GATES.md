@@ -4,6 +4,14 @@
 **Decision:** controlled beta only. No-go for public arbitrary APK execution.  
 **Current implementation PR:** [#146](https://github.com/kaustubhdua/Bharat-Sim/pull/146).
 
+## Current Production API probe — 22 Nov 2026
+
+- `GET /health/ready` returned HTTP 503: database unavailable, private storage unavailable, auth configured, worker not configured/offline.
+- `GET /api/v1/capabilities` returned HTTP 200: log analysis, risk planner, Failure DNA and evaluator scenarios enabled; database persistence, APK upload, analysis persistence, run comparison, worker dispatch, Android execution, Sarvam translation and Sarvam TTS all false.
+- The current Production deployment is still commit `76f5b7e6`; the current PR is not deployed to Production.
+
+This live API result takes precedence over configured environment-variable names or source-code implementation.
+
 ## P0 — production APK journey
 
 | Gate | Current evidence | Acceptance required |
