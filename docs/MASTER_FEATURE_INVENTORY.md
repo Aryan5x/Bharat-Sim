@@ -1,132 +1,77 @@
 # BharatSim — master feature inventory and judge acceptance status
 
 **Audit date:** 22 November 2026  
-**Decision:** controlled-beta prototype with substantial implemented code and CI evidence; not fully production-complete.
+**Decision:** controlled-beta implementation with meaningful CI fixture coverage; not yet production-complete.
 
-This inventory is the judge-facing source of truth. “Implemented” means code exists; “CI verified” means automated tests cover the stated scope; “production accepted” requires live evidence from the intended production infrastructure.
+“Implemented” means code exists. “CI verified” means automated tests cover the stated scope. “Production accepted” requires live evidence from the intended production infrastructure.
 
 ## 1. Feature status
 
 | Feature | Implemented | Automated / fixture evidence | Production acceptance remaining |
 |---|---|---|---|
-| Authentication | Supabase email/password/session code and protected workspace | JWT verification and auth regression tests | Real signup, confirmation, login, refresh, expiry, logout and recovery; two-user live test |
-| Tenant isolation | Owner-scoped queries and RLS migrations | Cross-user API unit tests | Live two-user matrix for all private routes, signed URLs and objects |
-| Personas | Authored device/network targets and custom persona schema | API and validation tests | Measure actual applied controls per run; profile target is not device measurement |
-| Risk planner | Category-aware deterministic ranking, editable journeys and JSON export | Backend/frontend contract tests and Playwright planner test | Confirm exported plan matches UI and never imply execution |
-| Logcat analysis | Deterministic signal detection, source-line evidence, recommendations and report generation | Backend tests and browser analysis journey | Authenticated live report journey, adversarial/large input review and persistence evidence |
-| Failure DNA | Normalized signature grouping and occurrence counts | Unit coverage for normalization/evidence fusion | Stability across repeated runs, versions and independent samples |
-| Backend classifier | Pure-Python TF-IDF centroid model (58 curated examples) | Known-signature regression tests | Independent labelled holdout, confusion matrix, calibration and external validation |
-| Worker classifier | TF-IDF word/character + logistic regression | GroupKFold metrics on 9,140 mixed weak-rule/templated samples | Label-quality/leakage audit and independently labelled external holdout |
-| Anomaly detection | Explicit thresholds + fixed-reference z-score heuristic | Regression tests for zero/partial telemetry | Validate thresholds, missing-data behavior and repeatability; not a trained covariance model |
-| BharatScore | Transparent heuristic summary score | Known fixture/report tests | Publish implementation weights, validate against repeated controlled runs; not a probability/certification |
-| APK validation | ZIP/manifest checks, bounded metadata and SHA-256 | Upload/security regression tests | Validate live uploads and malicious archive corpus |
-| Private APK storage | Signed/resumable upload, worker download and cleanup code | Signed-upload and storage-auth tests | Real private bucket upload/hash/download/delete/expiry/retention round-trip |
-| PostgreSQL persistence | Adapter and timestamped isolated migrations | CI applies all migrations to clean PostgreSQL and tests API restart persistence on PR #138 base | Confirm exact production DB target, apply reviewed migrations and verify live persistence |
-| Worker queue | Claims, leases, heartbeat, hash-bound download and result callback | Worker protocol and PostgreSQL integration tests | Live worker registration, revocation, concurrent claim, retry and recovery tests |
-| Legacy smoke worker | Install/launch, bounded observation and logcat capture | Worker unit/guard tests; the Android emulator workflow is a source-built proxy probe fixture, not a full customer-APK worker run | Dedicated host deployment and actual APK worker lifecycle evidence |
-| Full engine worker | Baseline/persona passes, telemetry, proxy shaping, battery/storage and recovery checks | Engine/shaper unit tests plus source-built CI proxy fixture; CI does not execute the full engine against an uploaded APK | Dedicated isolated worker deployment; repeated app-specific traffic-path and cleanup evidence |
-| Network shaping | Legacy emulator control-plane latency/bandwidth; engine proxy supports latency/bandwidth/loss stalls/resets for proxy traffic | CI measured source-built fixture HTTPS transfer and reset | Per-run arbitrary-app traffic evidence; default-deny egress; upload throughput and physical-device validation |
-| CPU / RAM | CPU throttling unsupported; RAM depends on emulator provisioning/readback | Condition-planner and safety tests | Never claim CPU throttle; document actual RAM allocation per emulator |
-| Speak-to-Test | Typed request, optional voice, schema-validated scenario plan, allowlisted scenario IDs | Backend/frontend tests with mocked provider and fixture builds | Live Sarvam credential, speech-to-text/interpretation and end-to-end scenario execution on deployed worker |
-| JanJeevan packs | Executable BharatPay sample journey and planned pack definitions in API | Controlled original/fixed APK fixture tests | Additional public-service, education, health, delivery fixtures and assertions |
-| FixProof | Original/candidate run comparison against scenario assertions | Backend/frontend contract tests | Two real completed runs of same scenario with persisted evidence |
-| Run comparison | Owner-scoped completed-run comparison | API tests | Production PostgreSQL data and real reports |
-| Reports / exports | Run detail, PDF and JSON export | Frontend unit/E2E and file-content checks | Durable report/artifact library, pagination and retention |
-| Sarvam translation/TTS | Optional provider integration with fallback handling | Provider mocks plus live evidence artifact for selected languages | Production key scope, deployed endpoint, quota/error and audio playback tests |
-| UI/theme/navigation | React/Vite workspace, theme provider, lazy routes and responsive layout | Unit tests, build and Playwright viewport checks | Manual keyboard, screen-reader, contrast, focus and mobile testing |
-| Deployment | Unified FastAPI/Vite deployment configuration | CI unified build and container smoke | Exact merged SHA deployment, readiness and authenticated browser smoke |
+| Authentication | Supabase email/password/session and protected workspace | JWT verification and auth regression tests | Real signup/confirmation/login/refresh/logout/recovery and two-user live test |
+| Tenant isolation | Owner-scoped API queries and ownership fields | API cross-user unit tests | Live two-account denial matrix for every private route, artifact and signed URL |
+| Personas | Authored device/network profiles and custom persona schema | API and validation tests | Measured emulator readback for each applied control |
+| Risk planner | Category-aware deterministic ranking, editable journeys and JSON export | Backend/frontend contract and Playwright tests | Keep planning separate from execution; validate final browser journey |
+| Logcat analysis | Deterministic signals, source-line evidence, recommendations and BharatScore | Backend tests and browser analysis/export journey | Authenticated deployed report journey and adversarial/large-input review |
+| Failure DNA | Normalized signature grouping and occurrence counts | Repeated-input fingerprint regression test | Repeated real emulator runs and persisted evidence across builds |
+| Backend classifier | TF-IDF centroid classifier | Hand-authored 48-example holdout; 79.2% accuracy, ~0.787 macro-F1; normal recall 0.50 | Larger independent external holdout, leakage review, class-wise metrics and calibration |
+| Worker classifier | TF-IDF word/character + logistic-regression path | Grouped cross-validation on mixed weak-rule/templated dataset | Independent labels and external holdout; training/CV is not field accuracy |
+| Anomaly detection | Explicit thresholds and fixed-reference z-score heuristic | Regression tests for zero/partial telemetry | Validate formulas, sample minimums and missing-data policy |
+| BharatScore | Transparent heuristic summary score | Fixture/report tests | Publish weights and validate against repeated controlled runs; not certification/probability |
+| APK validation | ZIP/manifest checks, bounded metadata and SHA-256 | Upload/security regression tests | Malicious archive corpus and deployed upload verification |
+| Private APK Storage | Signed/resumable/chunked upload and worker download code | Storage/auth tests and PostgreSQL migration tests | Server-only Supabase secret missing from Vercel; live upload/hash/download/delete/expiry/retention |
+| PostgreSQL | Adapter and all nine timestamped BharatSim migrations | Clean PostgreSQL CI; direct Supabase synthetic insert/read/delete verified | Vercel API DB target and restart persistence |
+| Worker queue | Claims, leases, heartbeat, hash-bound download and result callback | Worker protocol and PostgreSQL integration tests | Production registration/revocation/concurrency/retry/recovery |
+| Legacy smoke worker | Install/launch, bounded observation and logcat | Worker unit tests and Android CI fixture journey | Dedicated host and real user APK lifecycle |
+| Full engine worker | Baseline/persona passes, telemetry, proxy shaping, battery/storage/recovery | Engine/shaper unit tests and measured source-built HTTPS proxy fixture | Isolated production host and repeated app-specific data-plane evidence |
+| Network shaping | Latency/bandwidth and proxy loss stalls/resets; airplane-mode outage check | CI fixture reports `traffic_path_verified=true`; baseline median 890 ms vs bandwidth median 1,431 ms in a prior fixture | Real app traffic evidence per condition; apps bypassing system proxy are not shaped |
+| CPU / RAM | CPU throttling unsupported; RAM depends on emulator provisioning/readback | Planner and safety tests | Do not claim dynamic CPU throttling; report actual emulator RAM |
+| Speak-to-Test | Typed/voice request, schema-validated plans and allowlisted scenarios | Backend/frontend tests and controlled BharatPay fixture | Fresh deployed Sarvam and full APK execution journey |
+| JanJeevan packs | BharatPay original/fixed controlled sample; other packs planned | Fixture assertion tests | Build independent fixtures/assertions for additional packs |
+| FixProof | Original/candidate run comparison against scenario assertions | Repeated synthetic verdict regression test | Two or more real completed runs of the same scenario/build pair |
+| Run comparison | Owner-scoped completed-run comparison | API tests | Production PostgreSQL data and cross-user denial |
+| Reports/exports | Run detail and PDF/JSON export | Frontend E2E checks file bytes/content | Durable artifact library, retention and pagination |
+| Sarvam | Translation, STT, TTS and explanation integration | Provider mocks and earlier live provider evidence for selected Indian languages | Fresh deployed Vercel calls, current key validity and browser audio playback |
+| UI/theme/navigation | React/Vite workspace, Platform Showcase first, lazy routes and responsive layout | Unit tests, build and Playwright viewport/accessibility smoke | Manual keyboard/screen-reader/contrast/focus/mobile review |
+| Deployment | Unified FastAPI/Vite configuration | CI unified build and container smoke | Exact merged SHA, readiness and authenticated Production smoke |
 
 ## 2. Worker mode distinction
 
-- `BHARATSIM_WORKER_ENGINE=smoke` (default): legacy install/launch/logcat smoke worker. It does not provide the full engine's packet-loss/reset/outage behavior.
-- `BHARATSIM_WORKER_ENGINE=engine`: full baseline-vs-persona engine. Its host proxy affects only app traffic routed through Android's system proxy. Reports with no proxy connections must not claim network conditions affected the app.
-- CPU throttling is unsupported in both modes. RAM constraints are provisioning-dependent and must be evidenced from the actual emulator.
-- A personal laptop worker is scoped to one account, but it still runs on the user's host. It is not a per-job VM/microVM sandbox or a substitute for a restricted production worker host.
+- `BHARATSIM_WORKER_ENGINE=smoke` (default): legacy install/launch/logcat smoke worker; narrower emulator control set.
+- `BHARATSIM_WORKER_ENGINE=engine`: full baseline/persona engine. Host proxy shapes only traffic routed through Android's system proxy. Outage/recovery is a separate airplane-mode check.
+- CPU throttling is unsupported. RAM constraints depend on emulator provisioning and readback.
+- A personal laptop worker is owner-scoped convenience execution, not per-job VM/microVM isolation.
 
-## 3. Current verified repository evidence
+## 3. Live database and Storage observations — 22 Nov 2026
 
-- PR #138 base commit `8b2beac2`: CI run [44957776493](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44957776493) passed all seven jobs, including backend, frontend, E2E, PostgreSQL integration, worker guards, unified build and container smoke.
-- Android emulator workflow [44957776524](https://github.com/kaustubhdua/Bharat-Sim/actions/runs/44957776524) passed on the same code line.
-- The consolidated UI branch still requires a fresh CI and Android run after its changes.
-- A passing CI fixture is not a production DB, tenant-isolation or worker-isolation acceptance test.
+- Canonical active Supabase project identified in Vercel environment metadata: `hkyieaovolkethovyenb` (`common 1`, ap-south-1). The project contains separate `bharatsim` and `genomeguard` schemas.
+- All nine BharatSim repository migrations are recorded; live run/persona/scenario and personal-worker columns are present.
+- Direct database synthetic run insert/read/delete succeeded; the probe row was removed. Final live counts observed: 0 runs, 0 analyses, 0 workers, 0 artifacts.
+- `bharatsim-private` is non-public with a 150 MiB per-object cap and zero APK objects.
+- Vercel `BHARATSIM_MAX_UPLOAD_MB` is configured to 500 MiB; multipart objects are 45 MiB.
+- Vercel environment inventory does not contain `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The backend requires one for private Storage. Do not substitute the browser publishable key.
+- Sensitive `BHARATSIM_DATABASE_URL`, `SUPABASE_URL` and `sarvam_api` values remain masked; do not claim their runtime/provider health from variable presence alone.
+- Production public APK execution, worker isolation attestation and worker egress restriction remain false.
+- No APK object, customer run, worker row or artifact currently exists in the inspected production schema/bucket.
 
 ## 4. Release blockers
 
-1. Reconcile browser Auth/Storage project and server-side PostgreSQL target; protect the shared GenomeGuard database.
-2. Apply reviewed migrations to the confirmed production DB and verify persistence.
-3. Complete private Storage lifecycle and retention round-trip.
-4. Verify production Auth and tenant isolation with two real accounts.
-5. Deploy a dedicated per-job isolated Android worker with default-deny egress and cleanup.
-6. Complete APK → worker → report → reopen/export on production.
-7. Validate Failure DNA, FixProof and all claimed network conditions across repeated real runs.
-8. Independently validate ML and anomaly outputs.
-9. Complete Sarvam live provider and accessibility acceptance.
-10. Deploy and smoke-test the exact merged SHA.
+1. Add a server-only Supabase secret/service-role credential to Vercel Production and verify private Storage lifecycle.
+2. Verify the masked Vercel database URL points to the canonical project and run API persistence across invocations/restarts.
+3. Run a live two-account tenant-isolation matrix.
+4. Provision a dedicated KVM-capable worker host with per-job isolation and default-deny egress.
+5. Complete authenticated Production APK → worker → report → reopen/export.
+6. Repeat network, Failure DNA and FixProof measurements using real emulator executions.
+7. Independently validate ML/anomaly methodology.
+8. Verify current deployed Sarvam translation, STT, TTS and audio playback.
+9. Complete manual accessibility testing and exact-SHA Production deployment.
 
 ## 5. Judge-safe claims
 
 - Logcat analysis returns deterministic signals and source-line evidence.
 - The risk planner ranks test priorities; it does not execute a plan.
-- The legacy worker performs an Android smoke workflow; the full engine performs baseline/persona testing when explicitly configured.
-- Network controls are reported as requested, applied, read back or observed; arbitrary APK traffic may bypass the system proxy.
+- CI completes a controlled source-built APK journey through a local API and emulator worker.
+- Proxy traffic telemetry proves only the tested fixture's proxy path; arbitrary apps may bypass Android's system proxy.
 - ML, Failure DNA, anomaly and BharatScore outputs are triage evidence, not certified diagnoses or field-accuracy guarantees.
-- Public arbitrary APK execution remains disabled until production persistence, tenant isolation, worker isolation and egress controls pass independent acceptance.
-
-
-## 2026-11-22 follow-up verification
-
-### Database and Storage
-- The connected Supabase project `common 1` (`hkyieaovolkethovyenb`) contains the isolated `bharatsim` schema and the existing GenomeGuard schema. The repository's BharatSim migrations are scoped to `bharatsim`; no GenomeGuard migration or table was changed in this operation.
-- Applied the five missing BharatSim migrations: custom persona/APK metadata, worker claiming status, run scenario, 500 MiB APK metadata limit, and personal-worker ownership/key metadata. The connected project now records all nine BharatSim migrations.
-- Verified a synthetic run insert/read/delete round-trip against `bharatsim.runs`; the test row was removed and the final run count is zero.
-- Private bucket `bharatsim-private` exists, is non-public, and has a 150 MiB per-object cap. Multipart code uses 45 MiB objects for a 500 MiB total APK. No APK objects or Storage object policies exist yet.
-- Updated Vercel's next-deployment Auth/Storage URL and browser publishable key to the connected project and raised `BHARATSIM_MAX_UPLOAD_MB` to 500. The currently running Production deployment has not been redeployed with those environment changes.
-- Vercel does not have `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY` in its environment inventory. Private Storage therefore remains unavailable until an operator adds a server-only key. The production database URL is present as a sensitive variable but its value/target could not be inspected; production readiness returned `database=unavailable` at the last live check.
-
-### Worker and APK journey
-- The Android emulator CI workflow is more than a proxy-only check: it starts the local FastAPI control plane, registers an authenticated worker, uploads a source-built fixture APK, leases/downloads/installs/runs it, persists the report through the worker callback, and tests negative install/invalid-manifest cases. It also runs a separate measured HTTPS proxy fixture.
-- This proves the controlled CI fixture journey using local test persistence. It does not prove production Supabase Storage, a user-uploaded APK, or per-job isolation.
-- The worker agent and runner now share the 500 MiB APK size contract. A regression test was added to keep those limits aligned; the latest head still needs CI execution.
-- A KVM host bootstrap and Firecracker-per-job design exist in the repository, but no production KVM host or disposable microVM service has been provisioned. Render's connected services do not provide the required KVM boundary.
-
-### ML, Failure DNA, FixProof, Sarvam and accessibility
-- Added a hand-authored 48-line holdout for the backend centroid classifier. A pre-CI evaluation of the checked-in model produced 79.2% accuracy and approximately 0.787 macro-F1. Normal-class recall was 0.50; this small curated set is a regression check, not a field-accuracy claim.
-- The worker classifier's checked-in grouped cross-validation reports 78.43% accuracy (std 9.13%) and 0.7707 macro-F1 (std 10.24%) on weakly labelled LogHub plus templated examples; it is not production-field accuracy.
-- Added repeated-input stability tests for Failure DNA fingerprints and repeated FixProof verdicts. These are synthetic deterministic tests, not repeated physical-device executions.
-- The checked-in live Sarvam evidence from 2026-11-21 records successful non-fallback Sarvam interpretation, Hindi/Tamil TTS and STT. It was generated by the live-check script, not from a verified production Vercel endpoint.
-- Added a Playwright baseline accessibility semantics check for main landmark, control names and image alt text. Existing E2E tests cover responsive widths from 320px to 1440px. Manual screen-reader, keyboard, focus, contrast and real-device testing remains outstanding.
-
-### Latest code validation caveat
-- The latest fully green CI, dependency audit and Android emulator workflow are on commit `13a829407433a24a9cd3f508fe0a41ed4838b6d4`.
-- Additional readiness diagnostics, independent ML holdout, repeated Failure DNA/FixProof tests, 500 MiB worker limit alignment and accessibility checks were committed after that SHA. They have not yet been rerun in CI.
-- A Vercel preview for `13a8294` built successfully, but its readiness endpoint returned 503 because preview intentionally does not receive the Production-only database URL or server Storage key. The Vercel deployment API then reached its 100-deployments/day limit, so the latest head could not be redeployed during this session.
-
-
-## Latest validation update — 2026-11-22
-
-Code validation is complete on code SHA `93ecced18a273bf9c206eb60aab1b1e9f03c3b65`:
-
-- Backend: **253 passed, 2 skipped**.
-- Frontend unit tests: **61 passed**.
-- Playwright E2E: **14 passed**, including the accessible-name/alt-text smoke audit and 320–1440px responsive coverage.
-- PostgreSQL integration: **3 passed**; all nine isolated BharatSim migrations applied from a clean database.
-- Worker guards, unified Vercel build and container/Compose smoke: passed.
-- Dependency security audit: **Python and JavaScript checks passed**.
-- Android emulator smoke: **passed**. The CI flow starts the local API, registers a worker, uploads the source-built fixture APK, leases/downloads/installs/launches it, receives and persists the worker report, and checks failure cases.
-- Measured Android HTTPS fixture traffic: `traffic_path_verified=true`; baseline median 890 ms, bandwidth-only median 1,431 ms, observed bandwidth delta +541 ms; injected latency samples 150.47–150.61 ms. The CI gate uses per-tunnel proxy telemetry; wall-clock latency deltas are diagnostic only. This validates the source-built fixture path, not arbitrary customer APK traffic.
-
-Additional evidence:
-- Refreshed live Sarvam evidence at `2026-11-21T23:46:24Z`: five Hindi/Hinglish/Tamil interpretation requests returned HTTP 200 with provider `sarvam-105b` and no fallback; Hindi and Tamil TTS/STT were non-fixture. This is a live provider check, not a Production Vercel endpoint check.
-- The 48-case curated ML holdout and repeated Failure DNA/FixProof regression tests are included in the 253 passing backend tests. The holdout dry-run was 79.2% accuracy and approximately 0.787 macro-F1; it is not field accuracy.
-- The 500 MiB API/worker/runner upload limit is aligned.
-
-The following release blockers remain unchanged:
-- Vercel Production has a sensitive `BHARATSIM_DATABASE_URL`, but its value cannot be inspected through the connected integration; the last Production readiness check was HTTP 503 with database unavailable.
-- The Vercel environment inventory has no `SUPABASE_SECRET_KEY` or `SUPABASE_SERVICE_ROLE_KEY`. The private `bharatsim-private` bucket exists but has zero APK objects and no object policies; no live upload/download/delete lifecycle has passed.
-- No live two-account Production tenant test.
-- No deployed KVM/Firecracker per-job worker host; Vercel flags `BHARATSIM_WORKER_ISOLATION_ATTESTED=false` and `BHARATSIM_WORKER_EGRESS_RESTRICTED=false`.
-- No full Production user-uploaded APK → isolated worker → persistent report → reopen/export journey.
-- Manual screen-reader, keyboard/focus, contrast and physical-device checks remain.
-- The Production Vercel deployment remains on `76f5b7e`; environment edits apply only to the next deployment. The PR branch has passed the unified Vercel build, but no preview deployment was found for this final SHA during the validation window.
-
-This validation update is documentation-only; the tested application code is SHA `93ecced18a273bf9c206eb60aab1b1e9f03c3b65`.
+- Public arbitrary APK execution remains disabled until production persistence, tenant isolation, private Storage and worker isolation pass independent acceptance.

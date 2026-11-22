@@ -216,7 +216,7 @@ Rules:
   Add real_money ONLY if the developer explicitly asks to move real money or use their real bank/UPI account; real_personal_data only if they ask to use real customers' data;
   production_system only if they ask to hit a live production server; credentials only if the request contains a password, PIN, OTP or key; attack_or_abuse for anything harmful.
 - expected_behaviour and clarifications_needed are single strings: separate items with "; ", or "" if none.
-- clarifications_needed: ALWAYS empty string ("") whenever any error, problem or symptom is described, or when asking why an app isn't working or how to fix it. Any Android APK can be tested directly on the emulator. Questions only if the request is completely blank.
+
 - app_hint: the app name if mentioned, else "".
 - symptom: the main problem or error reported:
   * crash (app closes, "band ho jata hai", force close, exception)
@@ -310,15 +310,7 @@ def rule_based_spec(text: str) -> ModelSpec:
     devanagari = bool(re.search(r"[ऀ-ॿ]", text))
     latin_hindi = bool(re.search(r"\b(hai|nahi|karo|mein|toh|kya|ke|ki)\b", t))
     lang = "hi-IN" if devanagari else "hinglish" if latin_hindi else "en-IN"
-    symptom = ("crash" if _has(t, "crash")
-               else "freeze" if _has(t, "freeze")
-               else "slow_start" if any(k in t for k in ("slow to open", "late open", "der se khul", "startup"))
-               else "out_of_memory" if any(k in t for k in ("memory", "ram", "oom"))
-               else "storage_error" if _has(t, "storage")
-               else "network_failure" if (_has(t, "network_error") or _has(t, "slow") or _has(t, "drop") or "timeout" in t or "load" in t or "download" in t)
-               else "wrong_result" if _has(t, "pending") or _has(t, "duplicate")
-               else "other")
-    clarifications = [] if (journey != "other" or symptom != "other" or bool(text.strip())) else ["Which user journey should be tested (for example payment, form submit or upload)?"]
+
     return ModelSpec(
         symptom=symptom,
         language_detected=lang, objective=(text.strip()[:200] or "Test request"), app_hint="", journey=journey,
