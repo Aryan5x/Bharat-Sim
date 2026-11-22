@@ -112,7 +112,14 @@ export default function DiagnosisPanel({ runId, runFinished, reportedProblem, au
               {result.diagnosis.fix_steps.length > 0 && (
                 <div className="recommendation">
                   <Wrench size={14} />
-                  <span><b>How to fix it</b><ol>{result.diagnosis.fix_steps.map((s) => <li key={s}>{s}</li>)}</ol></span>
+                  <span>
+                    <b>How to fix it</b>
+                    <ol>
+                      {result.diagnosis.fix_steps.map((s) => (
+                        <li key={s}>{s.replace(/^\d+[\.\)]\s*/, "")}</li>
+                      ))}
+                    </ol>
+                  </span>
                 </div>
               )}
               {result.diagnosis.code_hint && <pre className="spec-json">{result.diagnosis.code_hint}</pre>}
