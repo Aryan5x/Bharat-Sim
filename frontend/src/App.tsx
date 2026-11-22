@@ -38,6 +38,7 @@ import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from 
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
+import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
 import type { SubmitRunOptions } from "./components/SpeakToTestView";
 import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
@@ -130,7 +131,8 @@ export default function App() {
 
       // Guest preview is limited to public personas and planning. Do not call
       // protected run-history or worker endpoints and create avoidable 401s.
-      if (previewMode) {
+      const publicLanding = location.pathname === "/landing" && !readSession();
+      if (previewMode || publicLanding) {
         setRuns([]);
         setWorkers([]);
         setNotice("");
@@ -473,6 +475,8 @@ export default function App() {
                       onSubmit={submitApk}
                     />
 
+                    <PlannerPanel selected={selected} />
+
                     <section className="panel log-panel">
                       <div className="panel-heading">
                         <div>
@@ -491,6 +495,7 @@ export default function App() {
                         </div>
                       )}
                       <textarea
+                        aria-label="Android logcat evidence"
                         disabled={previewMode}
                         value={logText}
                         onChange={(e) => setLogText(e.target.value)}
@@ -631,7 +636,7 @@ export default function App() {
                   onStartTesting={() => navigate("/new-test")}
                   onExplorePlanner={() => {
                     enterDemoMode();
-                    navigate("/");
+                    navigate("/overview");
                     window.setTimeout(() => {
                       document.getElementById("risk-planner")?.scrollIntoView({ behavior: "smooth", block: "center" });
                     }, 100);
@@ -665,7 +670,7 @@ export default function App() {
 
             <Route
               path="/speak"
-              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} runs={runs} />}
+              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
             />
             <Route path="/speak-to-test" element={<Navigate to="/speak" replace />} />
             <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />
