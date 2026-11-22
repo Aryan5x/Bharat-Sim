@@ -123,8 +123,8 @@ describe("Components tests with jsdom", () => {
     expect(container.textContent).toContain("Risk-first test plan");
     expect(container.textContent).toContain("payment retry");
     expect(container.textContent).toContain("92 / 100");
-    expect(container.textContent).toContain("High latency × limited bandwidth");
-    expect(container.textContent).toContain("test-selection hypotheses only");
+    expect(container.textContent).not.toContain("High latency × limited bandwidth");
+    expect(container.textContent).not.toContain("test-selection hypotheses");
   });
 
   it("PlannerPanel submits selected app category and edited critical journeys", async () => {
