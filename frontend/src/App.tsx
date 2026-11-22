@@ -38,8 +38,6 @@ import { DEFAULT_CUSTOM_PERSONA, customPersonaErrors, type CustomPersona } from 
 import RunsTable from "./components/RunsTable";
 import FindingCard from "./components/FindingCard";
 import ScoreRing from "./components/ScoreRing";
-import CapabilityPanel from "./components/CapabilityPanel";
-import PlannerPanel from "./components/PlannerPanel";
 import SarvamTranslation from "./components/SarvamTranslation";
 import type { SubmitRunOptions } from "./components/SpeakToTestView";
 import EvaluatorTourBanner from "./components/EvaluatorTourBanner";
@@ -112,9 +110,11 @@ export default function App() {
     ? "fixproof"
     : location.pathname.startsWith("/connect")
     ? "connect"
+    : location.pathname.startsWith("/overview")
+    ? "overview"
     : location.pathname.startsWith("/landing")
     ? "landing"
-    : "overview";
+    : "landing";
 
   async function refresh(silent = false) {
     if (!silent) setLoading(true);
@@ -371,7 +371,7 @@ export default function App() {
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => {
-          if (tab === "overview") navigate("/");
+          if (tab === "overview") navigate("/overview");
           else navigate(`/${tab}`);
         }}
         workers={workers}
@@ -390,7 +390,7 @@ export default function App() {
           onRefresh={() => void refresh()}
           onOpenEvaluatorTour={() => setShowEvaluatorModal(true)}
           onNavigateTab={(tab) => {
-            if (tab === "overview") navigate("/");
+            if (tab === "overview") navigate("/overview");
             else navigate(`/${tab}`);
           }}
         />
@@ -423,9 +423,12 @@ export default function App() {
 
           <Suspense fallback={<InferenceLoader text="Loading BharatSim workspace..." />}>
             <Routes>
-            {/* Overview route */}
+            {/* Default post-login home: Platform Showcase */}
+            <Route path="/" element={<Navigate to="/landing" replace />} />
+
+            {/* Overview / Dashboard route */}
             <Route
-              path="/"
+              path="/overview"
               element={
                 <div className="overview-page-wrapper">
                   <DashboardOverview
@@ -437,7 +440,7 @@ export default function App() {
                     apiStatus={apiStatus}
                     previewMode={previewMode}
                     onNavigateTab={(tab) => {
-                      if (tab === "overview") navigate("/");
+                      if (tab === "overview") navigate("/overview");
                       else navigate(`/${tab}`);
                     }}
                     onNavigateRun={(id) => navigate(`/runs/${encodeURIComponent(id)}`)}
@@ -469,8 +472,6 @@ export default function App() {
                         : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
                       onSubmit={submitApk}
                     />
-
-                    <PlannerPanel selected={selected} />
 
                     <section className="panel log-panel">
                       <div className="panel-heading">
@@ -617,8 +618,6 @@ export default function App() {
                         </div>
                       )}
                     </section>
-
-                    <CapabilityPanel capabilities={capabilities} loading={loading} />
                   </div>
                 </div>
               }
@@ -657,7 +656,7 @@ export default function App() {
                     ? "Sign in to register and execute private APK runs."
                     : "Run registration is unavailable until production PostgreSQL and private APK storage are configured."}
                   onSubmit={submitApkFile}
-                  onCancel={() => navigate("/")}
+                  onCancel={() => navigate("/overview")}
                   customPersona={customPersona}
                   onCustomPersonaChange={setCustomPersona}
                 />
@@ -827,7 +826,7 @@ export default function App() {
                           ? "Sign in to submit logcat, create private reports and export analysis evidence."
                           : "Paste Android logcat in Overview to create a report with source-line evidence."}
                       </p>
-                      {!previewMode && <button className="primary-button" onClick={() => navigate("/")}>Open log analyzer</button>}
+                      {!previewMode && <button className="primary-button" onClick={() => navigate("/overview")}>Open log analyzer</button>}
                     </div>
                   ) : (
                     <>
@@ -915,7 +914,7 @@ export default function App() {
                     <CircleAlert size={32} />
                     <b>Page not found</b>
                     <p>The screen you are looking for does not exist.</p>
-                    <button className="secondary-button" onClick={() => navigate("/")}>
+                    <button className="secondary-button" onClick={() => navigate("/overview")}>
                       Back to overview
                     </button>
                   </div>
