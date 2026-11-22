@@ -303,8 +303,16 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
         />
         <div className="speak-examples" aria-label="Example requests">
           {EXAMPLES.map((ex) => (
-            <button key={ex.label} type="button" className="chip-button" onClick={() => setText(ex.text)}>
-              {ex.label} example
+            <button
+              key={ex.label}
+              type="button"
+              className="chip-button"
+              onClick={() => {
+                setText(ex.text);
+                void interpret(ex.text);
+              }}
+            >
+              {ex.label}
             </button>
           ))}
         </div>
@@ -335,6 +343,24 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
 
       {spec && (
         <section className="panel full-panel spec-panel" aria-live="polite">
+          {text.trim() && (!spec.request_text || spec.request_text.trim() !== text.trim()) && (
+            <div className="alert notice-alert" role="status" style={{ marginBottom: 14 }}>
+              <CircleAlert size={16} />
+              <span>
+                This plan below is from an earlier request (<b>{spec.objective}</b>). Click <b>Create test plan</b> above to analyze your current request, or{" "}
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setSpec(null);
+                    sessionStorage.removeItem(STORE_KEY);
+                  }}
+                >
+                  dismiss this plan
+                </button>.
+              </span>
+            </div>
+          )}
           <div className="panel-heading">
             <div>
               <div className="section-kicker">INTERPRETED TEST PLAN · {spec.spec_id}</div>
@@ -344,9 +370,22 @@ export default function SpeakToTestView({ personas, previewMode, busy, onSubmitR
                 <b>{spec.language_detected}</b>
               </p>
             </div>
-            <span className={"risk-badge " + (spec.execution.eligible ? "low" : spec.execution.mode === "blocked" ? "critical" : "medium")}>
-              {spec.execution.mode === "scenario" ? "SCENARIO" : spec.execution.mode === "generic" ? "GENERIC RUN" : spec.execution.mode === "blocked" ? "BLOCKED" : "NEEDS DETAIL"}
-            </span>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+              <span className={"risk-badge " + (spec.execution.eligible ? "low" : spec.execution.mode === "blocked" ? "critical" : "medium")}>
+                {spec.execution.mode === "scenario" ? "SCENARIO" : spec.execution.mode === "generic" ? "GENERIC RUN" : spec.execution.mode === "blocked" ? "BLOCKED" : "NEEDS DETAIL"}
+              </span>
+              <button
+                type="button"
+                className="chip-button"
+                title="Discard this test plan"
+                onClick={() => {
+                  setSpec(null);
+                  sessionStorage.removeItem(STORE_KEY);
+                }}
+              >
+                Clear
+              </button>
+            </div>
           </div>
 
           <div className={"alert " + (spec.execution.eligible ? "notice-alert" : "error-alert")}>
