@@ -129,7 +129,8 @@ export default function App() {
 
       // Guest preview is limited to public personas and planning. Do not call
       // protected run-history or worker endpoints and create avoidable 401s.
-      if (previewMode) {
+      const publicLanding = location.pathname === "/landing" && !readSession();
+      if (previewMode || publicLanding) {
         setRuns([]);
         setWorkers([]);
         setNotice("");
@@ -618,6 +619,7 @@ export default function App() {
                         </div>
                       )}
                     </section>
+
                   </div>
                 </div>
               }
@@ -631,7 +633,7 @@ export default function App() {
                   onStartTesting={() => navigate("/new-test")}
                   onExplorePlanner={() => {
                     enterDemoMode();
-                    navigate("/");
+                    navigate("/overview");
                     window.setTimeout(() => {
                       document.getElementById("risk-planner")?.scrollIntoView({ behavior: "smooth", block: "center" });
                     }, 100);

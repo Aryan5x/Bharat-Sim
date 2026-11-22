@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+
 import { Activity, ArrowRight, LoaderCircle, ShieldCheck } from "lucide-react";
 import { authConfigured, enterDemoMode, exitDemoMode, isDemoMode, readSession, refreshSession, signIn, signOut, signUp, type UserSession } from "./auth";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const navigate = useNavigate();
+
   const [session, setSession] = useState<UserSession | null>(() => authConfigured ? readSession() : null);
   const [demoMode, setDemoMode] = useState(() => isDemoMode());
   const [checking, setChecking] = useState(authConfigured);
@@ -99,6 +99,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       {children}
     </>
   );
+
+  // The product tour is intentionally public; private workspace routes remain gated.
+  if (!session && location.pathname === "/landing") return <>{children}</>;
 
   if (!session) return (
     <main className="auth-screen">
