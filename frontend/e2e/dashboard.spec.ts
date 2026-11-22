@@ -34,6 +34,8 @@ test("public preview exposes the live planner but keeps private actions gated", 
   await page.getByRole("button", { name: /Explore public planner preview/ }).click();
 
   await expect(page.getByText(/Public preview · live persona and risk planner/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Test Android Apps Under/ })).toBeVisible();
+  await page.getByRole("button", { name: /Explore Risk Planner/ }).click();
   await expect(page.getByText("API Connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
