@@ -1,5 +1,4 @@
 import { it, expect } from "vitest";
-import { writeFileSync } from "node:fs";
 import { buildDeveloperReportPdf } from "../reportPdf";
 
 const sample = {
@@ -36,7 +35,6 @@ it("builds a multi-section PDF report", () => {
   const bytes = doc.output("arraybuffer");
   expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
   expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
-  if (process.env.BHARATSIM_PDF_PREVIEW) writeFileSync(process.env.BHARATSIM_PDF_PREVIEW, Buffer.from(bytes));
 });
 
 it("still builds when the AI analysis is unavailable", () => {
