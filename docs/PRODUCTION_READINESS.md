@@ -73,6 +73,7 @@ Implemented:
 - isolated BharatSim database schema and ownership columns
 
 Not production-accepted:
+- Supabase Auth leaked-password protection is currently disabled (Supabase security advisor WARN); enable it in Auth settings before broad public signup.
 - two real user accounts
 - cross-user list/read/update/delete denial for runs, analyses, artifacts and worker keys
 - signed URL owner/path binding, replay and expiry tests
