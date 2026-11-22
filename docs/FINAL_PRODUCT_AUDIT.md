@@ -16,6 +16,12 @@
 - Added repeated Failure DNA/FixProof regressions, a 48-example hand-authored classifier holdout, worker APK-size contract tests and accessibility smoke checks.
 - Corrected the public product tour and public planner preview route so the product landing is public while private workspace routes remain gated.
 
+## Current Production API probe — 22 Nov 2026
+
+The live Production API currently returns HTTP 503 from `/health/ready`: database unavailable, private storage unavailable, authentication configured, worker not configured and offline. The capabilities endpoint returns HTTP 200 but reports database persistence, APK upload, analysis persistence, run comparison, worker dispatch, Android execution, Sarvam translation and TTS as disabled. Log analysis, risk planner, Failure DNA and evaluator scenarios remain enabled.
+
+Production is still deployed from `76f5b7e6`, not the release PR. This is the actual user-facing status today.
+
 ## Connected infrastructure evidence
 
 - Canonical active Supabase project: `hkyieaovolkethovyenb` (`common 1`, ap-south-1), identified by Vercel environment metadata. BharatSim uses an isolated `bharatsim` schema alongside GenomeGuard.
