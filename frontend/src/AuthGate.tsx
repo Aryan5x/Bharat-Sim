@@ -82,9 +82,6 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     setPassword("");
   }
 
-  // The product tour is intentionally public; private workspace routes remain gated.
-  if (!session && location.pathname === "/landing") return <>{children}</>;
-
   if (!session && demoMode) return (
     <>
       <div className="public-preview-bar" role="status">
@@ -94,6 +91,9 @@ export default function AuthGate({ children }: { children: ReactNode }) {
       {children}
     </>
   );
+
+  // The product tour is intentionally public; private workspace routes remain gated.
+  if (!session && location.pathname === "/landing") return <>{children}</>;
 
   if (!session) return (
     <main className="auth-screen">
