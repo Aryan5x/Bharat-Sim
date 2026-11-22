@@ -4483,3 +4483,13 @@ footer {
 [data-theme="dark"] .condition-contract { background: #0D1220 !important; border-color: #252e42 !important; }
 [data-theme="dark"] .runs-empty { background: #0d1017 !important; border-color: #2b344a !important; }
 [data-theme="dark"] .upload-zone.dragging { border-color: #2563eb !important; background: #182234 !important; }
+
+/* Gemini report + voice assistant */
+.ai-report,.ai-assistant{margin:14px 0}
+.ai-issue{border:1px solid var(--border-default);border-radius:8px;padding:10px 12px;margin:10px 0}
+.ai-issue summary{cursor:pointer;color:var(--text-primary)}
+.assistant-log{display:grid;gap:10px;max-height:380px;overflow:auto;margin-bottom:12px}
+.assistant-turn{padding:10px 12px;border-radius:8px;border:1px solid var(--border-default);background:var(--bg-surface-elevated)}
+.assistant-turn.user{border-color:var(--accent-border)}
+.assistant-turn p{margin:4px 0}
+.assistant-input{flex:1;min-width:180px;margin:0}
