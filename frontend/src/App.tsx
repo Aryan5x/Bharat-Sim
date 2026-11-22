@@ -666,7 +666,7 @@ export default function App() {
 
             <Route
               path="/speak"
-              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} />}
+              element={<SpeakToTestView personas={personas} previewMode={previewMode} busy={busy} onSubmitRun={submitApkFile} runs={runs} />}
             />
             <Route path="/speak-to-test" element={<Navigate to="/speak" replace />} />
             <Route path="/fixproof" element={<FixProofView runs={runs} previewMode={previewMode} />} />

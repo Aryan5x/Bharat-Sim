@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { CheckCircle2, CircleAlert, HelpCircle, LoaderCircle, Stethoscope, Wrench, XCircle } from "lucide-react";
 import SarvamAudioPlayer from "./SarvamAudioPlayer";
 import { diagnoseRun, type Diagnosis } from "../speak";
@@ -21,9 +21,10 @@ interface DiagnosisPanelProps {
   runId: string;
   runFinished: boolean;
   reportedProblem?: string;
+  autoDiagnose?: boolean;
 }
 
-export default function DiagnosisPanel({ runId, runFinished, reportedProblem }: DiagnosisPanelProps) {
+export default function DiagnosisPanel({ runId, runFinished, reportedProblem, autoDiagnose }: DiagnosisPanelProps) {
   const [problem, setProblem] = useState(reportedProblem || "");
   const [language, setLanguage] = useState<string>("hi-IN");
   const [result, setResult] = useState<Diagnosis | null>(null);
@@ -43,6 +44,12 @@ export default function DiagnosisPanel({ runId, runFinished, reportedProblem }: 
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (autoDiagnose && runFinished && reportedProblem && !result && !busy && !error) {
+      void run();
+    }
+  }, [autoDiagnose, runFinished, reportedProblem]);
 
   const verdict = result ? VERDICT[result.reproduction.verdict] : null;
   const spoken = result

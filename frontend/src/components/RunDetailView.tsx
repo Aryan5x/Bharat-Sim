@@ -395,6 +395,7 @@ export default function RunDetailView({ personas }: RunDetailViewProps) {
         key={run.id}
         runId={run.id}
         runFinished={!isRunActive(run.status)}
+        autoDiagnose={true}
         reportedProblem={(run as unknown as { scenario?: { spec?: { request_text?: string; objective?: string } } }).scenario?.spec?.request_text
           || (run as unknown as { scenario?: { spec?: { objective?: string } } }).scenario?.spec?.objective}
       />

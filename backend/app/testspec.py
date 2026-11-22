@@ -215,7 +215,7 @@ Rules:
   Add real_money ONLY if the developer explicitly asks to move real money or use their real bank/UPI account; real_personal_data only if they ask to use real customers' data;
   production_system only if they ask to hit a live production server; credentials only if the request contains a password, PIN, OTP or key; attack_or_abuse for anything harmful.
 - expected_behaviour and clarifications_needed are single strings: separate items with "; ", or "" if none.
-- clarifications_needed: questions (in English) only when essential information is missing, e.g. which journey. Do not ask which app: the developer uploads the APK separately. Empty list otherwise.
+- clarifications_needed: questions (in English) only when essential information is missing. If a clear symptom (crash, freeze, slow_start, out_of_memory, network_failure, storage_error, ui_jank) is reported, leave clarifications_needed empty (""). Do not ask which app: the developer uploads the APK separately. Empty string otherwise.
 - app_hint: the app name if mentioned, else "".
 - symptom: the main problem the developer reports: crash (app closes, "band ho jata hai"), freeze (hangs, ANR, not responding),
   slow_start (takes long to open), out_of_memory, network_failure (fails/times out/keeps loading on bad network), storage_error,
@@ -296,13 +296,13 @@ def rule_based_spec(text: str) -> ModelSpec:
     devanagari = bool(re.search(r"[ऀ-ॿ]", text))
     latin_hindi = bool(re.search(r"\b(hai|nahi|karo|mein|toh|kya|ke|ki)\b", t))
     lang = "hi-IN" if devanagari else "hinglish" if latin_hindi else "en-IN"
-    clarifications = [] if journey != "other" else ["Which user journey should be tested (for example payment, form submit or upload)?"]
     symptom = ("crash" if _has(t, "crash") else "freeze" if any(k in t for k in ("hang", "freeze", "anr", "not responding", "atak"))
                else "slow_start" if any(k in t for k in ("slow to open", "late open", "der se khul", "startup"))
                else "out_of_memory" if any(k in t for k in ("memory", "ram", "oom"))
                else "storage_error" if _has(t, "storage")
                else "network_failure" if (_has(t, "slow") or _has(t, "drop") or "timeout" in t or "load" in t)
                else "wrong_result" if _has(t, "pending") or _has(t, "duplicate") else "other")
+    clarifications = [] if (journey != "other" or symptom != "other") else ["Which user journey should be tested (for example payment, form submit or upload)?"]
     return ModelSpec(
         symptom=symptom,
         language_detected=lang, objective=(text.strip()[:200] or "Test request"), app_hint="", journey=journey,
@@ -439,7 +439,7 @@ def build_spec(model: ModelSpec, source_text: str, interpreter: dict[str, Any]) 
         "matched_scenario": scenario_id,
         "safety": {"flags": list(model.safety_flags),
                    "classification": "blocked" if model.safety_flags else "controlled-test-only"},
-        "clarifications_needed": [] if scenario else model.clarifications_needed or (
+        "clarifications_needed": [] if (scenario or model.symptom != "other") else model.clarifications_needed or (
             ["Which user journey should be tested (for example payment, form submit or upload)?"]
             if model.journey == "other" and model.symptom == "other" and not scenario else []),
         "execution": {"eligible": eligible, "mode": mode, "scenario_id": scenario_id if eligible else None,

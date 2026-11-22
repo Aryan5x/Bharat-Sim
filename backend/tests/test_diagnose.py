@@ -180,8 +180,11 @@ def test_typed_problem_is_classified_by_sarvam(monkeypatch):
 
 
 def test_keyword_fallback_recognises_hinglish_crash():
-    assert testspec.rule_based_spec(HINGLISH_CRASH).symptom == "crash"
+    spec = testspec.rule_based_spec(HINGLISH_CRASH)
+    assert spec.symptom == "crash"
+    assert spec.clarifications_needed == []
     assert testspec.rule_based_spec("app khulte hi close ho jata hai").symptom == "crash"
+    assert testspec.rule_based_spec("Meri app 2g network pe crash ho rahi hai, why is it happening and how can i fix that").clarifications_needed == []
 
 
 def test_schema_uses_single_strings_and_parser_splits_them():
