@@ -8,7 +8,7 @@ export function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "dark";
   const saved = localStorage.getItem(THEME_KEY);
   if (saved === "light" || saved === "dark") return saved;
-  return "dark"; // Default to dark developer theme
+  return "light"; // Default to light professional theme
 }
 
 export function applyTheme(theme: Theme) {

@@ -2,9 +2,10 @@
 // Content-Security-Policy can stay strict with script-src 'self'.
 (function () {
   try {
-    var saved = localStorage.getItem("bharatsim.theme");
-    document.documentElement.dataset.theme = saved === "light" ? "light" : "dark";
+    // Support both key variants for compatibility
+    var saved = localStorage.getItem("bharatsim-theme") || localStorage.getItem("bharatsim.theme");
+    document.documentElement.dataset.theme = saved === "dark" ? "dark" : "light";
   } catch (e) {
-    document.documentElement.dataset.theme = "dark";
+    document.documentElement.dataset.theme = "light";
   }
 })();

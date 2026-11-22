@@ -2683,6 +2683,8 @@ def _personal_worker_rows(conn, owner_id: str) -> list[dict[str, Any]]:
 @app.get("/api/v1/my-workers")
 def list_personal_workers(request: Request):
     owner_id = getattr(request.state, "owner_id", None)
+    if not owner_id and not AUTH_REQUIRED and APP_ENV not in {"production", "prod"}:
+        owner_id = "00000000-0000-0000-0000-000000000001"
     if not owner_id:
         raise HTTPException(status_code=401, detail="Sign in to manage your laptop workers.")
     with db() as conn:
@@ -2693,6 +2695,8 @@ def list_personal_workers(request: Request):
 def create_personal_worker(payload: PersonalWorkerRequest, request: Request):
     """Issue a worker key that can only run this user's own tests. The key is shown once."""
     owner_id = getattr(request.state, "owner_id", None)
+    if not owner_id and not AUTH_REQUIRED and APP_ENV not in {"production", "prod"}:
+        owner_id = "00000000-0000-0000-0000-000000000001"
     if not owner_id:
         raise HTTPException(status_code=401, detail="Sign in to connect a laptop.")
     worker_id = "u-" + uuid.uuid4().hex[:10]
@@ -2715,6 +2719,8 @@ def create_personal_worker(payload: PersonalWorkerRequest, request: Request):
 @app.delete("/api/v1/my-workers/{worker_id}")
 def revoke_personal_worker(worker_id: str, request: Request):
     owner_id = getattr(request.state, "owner_id", None)
+    if not owner_id and not AUTH_REQUIRED and APP_ENV not in {"production", "prod"}:
+        owner_id = "00000000-0000-0000-0000-000000000001"
     if not owner_id:
         raise HTTPException(status_code=401, detail="Sign in to manage your laptop workers.")
     with db() as conn:
