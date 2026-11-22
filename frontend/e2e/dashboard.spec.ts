@@ -48,7 +48,7 @@ test("public preview exposes the live planner but keeps private actions gated", 
 
 test("dashboard connects to the real API and renders authored profiles", async ({ page }) => {
   await installLocalWorkspaceSession(page);
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
   await expect(page.getByText("Budget Android", { exact: true }).first()).toBeVisible();
@@ -63,7 +63,7 @@ test("log analysis reports findings from submitted evidence and preserves source
   await installLocalWorkspaceSession(page);
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.stack || error.message));
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByText("API connected")).toBeVisible();
 
   const input = [
@@ -126,7 +126,7 @@ test("log analysis reports findings from submitted evidence and preserves source
 
 test("run registration is disabled until a real APK is selected", async ({ page }) => {
   await installLocalWorkspaceSession(page);
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByText("API connected")).toBeVisible();
 
   const register = page.getByRole("button", { name: /Start test/ });
@@ -137,7 +137,7 @@ test("run registration is disabled until a real APK is selected", async ({ page 
 
 test("Configure a test navigates to the real APK registration form", async ({ page }) => {
   await installLocalWorkspaceSession(page);
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByText("API connected")).toBeVisible();
 
   await page.getByRole("button", { name: /Launch New Test/ }).click();
@@ -159,7 +159,7 @@ test("dashboard remains usable at narrow mobile widths without horizontal overfl
   await installLocalWorkspaceSession(page);
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 812 });
-    await page.goto("/");
+    await page.goto("/overview");
     await expect(page.getByText("API connected")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Bharat personas" })).toBeVisible();
     const dimensions = await page.evaluate(() => ({
@@ -176,7 +176,7 @@ test("dashboard remains usable at narrow mobile widths without horizontal overfl
 
 test("project documentation link points to the canonical GitHub README", async ({ page }) => {
   await installLocalWorkspaceSession(page);
-  await page.goto("/");
+  await page.goto("/overview");
   const docsLink = page.getByRole("link", { name: /Project documentation on GitHub/ });
   const href = await docsLink.getAttribute("href");
   expect(href).toContain("github.com/kaustubhdua/Bharat-Sim#readme");
@@ -186,7 +186,7 @@ test("project documentation link points to the canonical GitHub README", async (
 
 test("overview uses live readiness instead of a synthetic device demo", async ({ page }) => {
   await installLocalWorkspaceSession(page);
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByRole("heading", { name: "Service & Worker Status" })).toBeVisible();
   await expect(page.getByText("Live health verified through control plane contracts.")).toBeVisible();
   await expect(page.getByText(/TF-IDF centroid classifier available|Classifier unavailable|Capability status unknown/)).toBeVisible();
@@ -196,7 +196,7 @@ test("overview uses live readiness instead of a synthetic device demo", async ({
 
 test("secure workspace requires sign-in when no session exists", async ({ page }) => {
   // No auth fixture is installed for this test; assert the default guest gate.
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByRole("heading", { name: "Welcome back." })).toBeVisible();
   await expect(page.getByLabel("Email address")).toBeVisible();
   await expect(page.getByLabel("Password")).toBeVisible();
@@ -222,7 +222,7 @@ test("workspace sections never overlap at common desktop, tablet and phone width
   const widths = [320, 375, 520, 720, 768, 1024, 1280, 1440];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+    await page.goto("/overview");
     await expect(page.getByText("API connected")).toBeVisible();
 
     if (width <= 720) {
@@ -281,7 +281,7 @@ test("workspace sections never overlap at common desktop, tablet and phone width
 
 test("risk planner validates journeys and returns a real API-generated plan", async ({ page }) => {
   await installLocalWorkspaceSession(page);
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByText("API connected")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Risk-first test plan" })).toBeVisible();
 
@@ -322,7 +322,7 @@ test("public product landing is reachable without signing in", async ({ page }) 
 
 test("primary workspace controls expose accessible names and images have alt text", async ({ page }) => {
   await installLocalWorkspaceSession(page);
-  await page.goto("/");
+  await page.goto("/overview");
   await expect(page.getByText("API connected")).toBeVisible();
 
   const audit = await page.evaluate(() => {
